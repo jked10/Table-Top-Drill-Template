@@ -76,25 +76,44 @@ Rules: exactly ${opts.count} injects, progressing through the phases in order; v
     return txt;
   }
 
+  // Try several model names so generation works regardless of which the
+  // account has access to (newer accounts may not have older aliases & vice-versa).
+  const MODEL_CANDIDATES = [
+    "claude-3-5-haiku-latest",
+    "claude-3-5-haiku-20241022",
+    "claude-3-haiku-20240307",
+    "claude-3-5-sonnet-latest"
+  ];
+  function savedModel() { return localStorage.getItem("tdf_model") || ""; }
+
   async function callAnthropic(prompt) {
     const key = userKey();
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
-      body: JSON.stringify({
-        model: "claude-3-5-haiku-latest",
-        max_tokens: 4096,
-        messages: [{ role: "user", content: prompt }]
-      })
-    });
-    if (!res.ok) {
+    const tryModels = savedModel() ? [savedModel(), ...MODEL_CANDIDATES] : MODEL_CANDIDATES;
+    let lastErr = null;
+    for (const model of tryModels) {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      if (res.ok) {
+        localStorage.setItem("tdf_model", model); // remember the one that worked
+        const data = await res.json();
+        return (data.content && data.content[0] && data.content[0].text) || "";
+      }
       let detail = "";
       try { const j = await res.json(); detail = (j && j.error && j.error.message) || ""; } catch (e) {}
+      // a 404 / model-not-found just means "try the next model"
+      if (res.status === 404 || /model/i.test(detail) && /not.*found|unknown|does not exist/i.test(detail)) { lastErr = { status: res.status, detail }; continue; }
       let msg;
       if (res.status === 401) msg = "Your API key was rejected — check it's pasted correctly (starts with sk-ant-).";
       else if (res.status === 400 && /credit|balance/i.test(detail)) msg = "Your Anthropic account has no credit yet — add credit in console.anthropic.com → Billing.";
@@ -103,8 +122,8 @@ Rules: exactly ${opts.count} injects, progressing through the phases in order; v
       else msg = `Anthropic error ${res.status}${detail ? ": " + detail : ""}`;
       const err = new Error(msg); err.userMessage = msg; throw err;
     }
-    const data = await res.json();
-    return (data.content && data.content[0] && data.content[0].text) || "";
+    const msg = "None of the available models could be reached on your account — your access may be limited. (" + (lastErr ? lastErr.status : "404") + ")";
+    const err = new Error(msg); err.userMessage = msg; throw err;
   }
 
   function extractJSON(text) {
