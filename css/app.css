@@ -195,6 +195,21 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 .hero .lede { color: var(--ink-soft); font-size: 18px; max-width: 620px; margin: 14px auto 0; }
 .home-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 8px; }
 @media (max-width: 860px){ .home-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Home / hero — split layout (Option B) ---------- */
+.hero-split { display: grid; grid-template-columns: 1.25fr 0.95fr; gap: 30px; align-items: center; text-align: left; }
+.hs-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--primary); font-weight: 600; }
+.hero-split h1 { font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -0.03em; margin-top: 10px; }
+.hero-split .lede { color: var(--ink-soft); font-size: 17px; margin: 14px 0 0; max-width: none; }
+.hs-cta { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
+.stepper { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow-sm); }
+.stepper .sh { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+.stepper .step { display: flex; gap: 13px; align-items: flex-start; padding: 9px 0; }
+.stepper .step:not(:last-child) { border-bottom: 1px solid var(--line-soft); }
+.stepper .step .n { width: 26px; height: 26px; border-radius: 50%; background: var(--primary-soft); color: var(--primary-deep); font-weight: 700; font-size: 13px; display: grid; place-items: center; flex: none; }
+.stepper .step .t { font-weight: 600; font-size: 14px; display: block; }
+.stepper .step .d { color: var(--muted); font-size: 12px; display: block; }
+@media (max-width: 780px){ .hero-split { grid-template-columns: 1fr; gap: 22px; } }
 .feat { padding: 20px; }
 .feat .fic { width: 40px; height: 40px; border-radius: 10px; background: var(--primary-soft); color: var(--primary-deep); display: grid; place-items: center; margin-bottom: 12px; }
 .feat h4 { font-size: 15.5px; margin-bottom: 5px; }

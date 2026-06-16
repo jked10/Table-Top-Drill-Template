@@ -111,7 +111,7 @@ function newSession() {
   return {
     id: uid(),
     createdISO: new Date().toISOString(),
-    title: "ISPS Code Tabletop Drill",
+    title: "",
     dateISO: todayISO(),
     facilitator: { name: "", position: "Facilitator / PFSO", email: "" },
     participants: [],
@@ -255,13 +255,23 @@ function renderSetup() {
   const resume = (S.scenario && S.step === "setup" && S.answers.some(a => a.revealed));
   view().innerHTML = `<div class="wrap">
     ${progressBar("setup")}
-    <div class="hero" style="margin-bottom:24px">
-      <div class="eyebrow">${esc(CFG.facility.standard)}</div>
-      <h1 style="margin-top:10px">Tabletop Drill Facilitator</h1>
-      <p class="lede">Run a structured, scored ISPS tabletop exercise against the
-        <strong>${esc(CFG.facility.planTitle)}</strong>. Register the team, generate a scenario,
-        walk the response inject-by-inject, and produce a sign-off-ready report for HSE and audit.</p>
-      <div style="margin-top:16px"><button class="btn" id="joinLive">${ICON.users} Joining on your own device? Enter a session code</button></div>
+    <div class="hero-split" style="margin-bottom:24px">
+      <div class="hs-main">
+        <div class="hs-eyebrow">Training · Drills · Readiness</div>
+        <h1>Rehearse any procedure. Score the response.</h1>
+        <p class="lede">Build structured tabletop exercises for emergency response, security, safety, or standard operating procedures. Walk your team through the scenario, capture every decision, and produce a sign-off-ready report for training records and audit.</p>
+        <div class="hs-cta">
+          <button class="btn primary lg" id="heroStart">Start a new drill ${ICON.chevR}</button>
+          <button class="btn" id="joinLive">${ICON.users} Enter a session code</button>
+        </div>
+      </div>
+      <div class="stepper">
+        <div class="sh">How it works</div>
+        <div class="step"><span class="n">1</span><span><span class="t">Set up</span><span class="d">Team, roles &amp; scenario</span></span></div>
+        <div class="step"><span class="n">2</span><span><span class="t">Brief</span><span class="d">Situation &amp; references</span></span></div>
+        <div class="step"><span class="n">3</span><span><span class="t">Run the drill</span><span class="d">Decision-by-decision</span></span></div>
+        <div class="step"><span class="n">4</span><span><span class="t">Report</span><span class="d">Score, sign-off &amp; export</span></span></div>
+      </div>
     </div>
 
     <div class="card pad stack" style="margin-bottom:20px">
@@ -292,7 +302,7 @@ function renderSetup() {
         <h2 style="margin-top:6px;font-size:22px">Facilitator &amp; session details</h2>
       </div>
       <div class="grid-2">
-        <label class="field"><span class="lab">Drill title</span><input type="text" id="f-title" value="${esc(S.title)}"></label>
+        <label class="field"><span class="lab">Drill title</span><input type="text" id="f-title" value="${esc(S.title)}" placeholder="e.g. Q3 Emergency Response Drill"></label>
         <label class="field"><span class="lab">Date</span><input type="text" id="f-date" value="${esc(S.dateISO)}" placeholder="YYYY-MM-DD"></label>
         <label class="field"><span class="lab">Facilitator name</span><input type="text" id="f-fname" value="${esc(S.facilitator.name)}" placeholder="e.g. ${esc(CFG.pfso.name)}"></label>
         <label class="field"><span class="lab">Facilitator position</span><input type="text" id="f-fpos" value="${esc(S.facilitator.position)}"></label>
@@ -365,6 +375,8 @@ function renderSetup() {
   const setupLink = $("#liveSetupLink");
   if (setupLink) setupLink.onclick = (e) => { e.preventDefault(); openSettings(); };
   $("#joinLive").onclick = () => { S.mode = "participant"; S.step = "join"; saveSession(); render(); };
+  const heroStart = $("#heroStart");
+  if (heroStart) heroStart.onclick = () => { const el = $("#setupCard"); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 16, behavior: "smooth" }); };
 }
 
 function renderParticipants() {
