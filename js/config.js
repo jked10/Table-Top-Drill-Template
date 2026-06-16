@@ -33,21 +33,21 @@ const CONFIG_FIREBASE = {
 
 const DEFAULT_CONFIG = {
   org: {
-    name: "Spring Garden Terminal",
+    name: "",
     logoDataUrl: ""            // optional base64 logo, set via Settings
   },
   facility: {
-    name: "Spring Garden Terminal",
-    location: "St. Michael, Barbados",
-    planTitle: "Port Facility Security Plan (PFSP)",
-    planRef: "Manual No. SP 01",
-    standard: "ISPS Code · SOLAS Ch. XI-2",
-    type: "marine bulk LPG terminal — shore storage tanks linked by pipeline to a remote sea berth; ISPS security measures apply while a gas carrier is alongside discharging",
-    planText: ""   // paste your full plan text via Settings to ground AI-generated scenarios
+    name: "",
+    location: "",
+    planTitle: "",
+    planRef: "",
+    standard: "",
+    type: "",
+    planText: ""   // upload your procedure via Settings to ground AI-generated scenarios
   },
   pfso: {
-    name: "Junair DeSouza",
-    position: "Port Facility Security Officer",
+    name: "",
+    position: "",
     phone: "(246) 417 6403",
     email: "j.desouza@rubis-caribbean.com"
   },

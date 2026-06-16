@@ -113,7 +113,7 @@ function newSession() {
     createdISO: new Date().toISOString(),
     title: "",
     dateISO: todayISO(),
-    facilitator: { name: "", position: "Facilitator / PFSO", email: "" },
+    facilitator: { name: "", position: "Facilitator", email: "" },
     participants: [],
     scenarioMode: "random",
     pickId: null,
@@ -296,15 +296,41 @@ function renderSetup() {
       </div>
     </div>
 
-    <div class="card pad stack" id="setupCard">
+    <div class="card pad stack" id="procCard">
       <div>
-        <div class="eyebrow">Step 1 \u00b7 Session</div>
+        <div class="eyebrow">Step 1 \u00b7 Procedure</div>
+        <h2 style="margin-top:6px;font-size:22px">What are we rehearsing?</h2>
+        <p class="muted small" style="margin-top:4px">Name the organisation and the procedure, then upload the document. Scenarios &amp; model answers are generated from this.</p>
+      </div>
+      <div class="grid-2">
+        <label class="field"><span class="lab">Organisation name</span><input type="text" id="f-org" value="${esc(CFG.facility.name)}" placeholder="e.g. Acme Operations Ltd"></label>
+        <label class="field"><span class="lab">SOP / procedure title</span><input type="text" id="f-plan" value="${esc(CFG.facility.planTitle)}" placeholder="e.g. Emergency Response SOP"></label>
+        <label class="field"><span class="lab">Location <span class="muted">(optional)</span></span><input type="text" id="f-loc" value="${esc(CFG.facility.location)}" placeholder="e.g. Site / city"></label>
+        <label class="field"><span class="lab">Document reference <span class="muted">(optional)</span></span><input type="text" id="f-ref" value="${esc(CFG.facility.planRef)}" placeholder="e.g. SOP-014 Rev 3"></label>
+      </div>
+      <label class="field"><span class="lab">Setting / context <span class="muted">(optional, helps tailor scenarios)</span></span>
+        <input type="text" id="f-ftype" value="${esc(CFG.facility.type||'')}" placeholder="e.g. 12-bed care home; or chemical warehouse with on-site tanker loading">
+      </label>
+      <div class="field">
+        <span class="lab">Upload the procedure you would like to rehearse</span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 8px">
+          <input type="file" id="f-planfile" accept=".pdf,.docx,.txt,.md,.csv,application/pdf" style="flex:1;min-width:220px">
+          <span class="muted small" id="f-planstate">${CFG.facility.planText ? `${(CFG.facility.planText.length/1000).toFixed(1)}k characters loaded` : "No procedure loaded yet"}</span>
+        </div>
+        <textarea id="f-plantext" rows="5" placeholder="Upload a PDF or Word (.docx) document above and its text appears here — or paste/edit the procedure text directly. The AI grounds every model answer and reference in this text.">${esc(CFG.facility.planText||'')}</textarea>
+        <span class="hint">Files are read in your browser only — nothing is uploaded to a server.</span>
+      </div>
+    </div>
+
+    <div class="card pad stack" id="setupCard" style="margin-top:20px">
+      <div>
+        <div class="eyebrow">Step 2 \u00b7 Session</div>
         <h2 style="margin-top:6px;font-size:22px">Facilitator &amp; session details</h2>
       </div>
       <div class="grid-2">
         <label class="field"><span class="lab">Drill title</span><input type="text" id="f-title" value="${esc(S.title)}" placeholder="e.g. Q3 Emergency Response Drill"></label>
         <label class="field"><span class="lab">Date</span><input type="text" id="f-date" value="${esc(S.dateISO)}" placeholder="YYYY-MM-DD"></label>
-        <label class="field"><span class="lab">Facilitator name</span><input type="text" id="f-fname" value="${esc(S.facilitator.name)}" placeholder="e.g. ${esc(CFG.pfso.name)}"></label>
+        <label class="field"><span class="lab">Facilitator name</span><input type="text" id="f-fname" value="${esc(S.facilitator.name)}" placeholder="e.g. Jane Smith"></label>
         <label class="field"><span class="lab">Facilitator position</span><input type="text" id="f-fpos" value="${esc(S.facilitator.position)}"></label>
         <label class="field"><span class="lab">Facilitator email</span><input type="email" id="f-femail" value="${esc(S.facilitator.email)}" placeholder="name@company.com"></label>
       </div>
@@ -313,7 +339,7 @@ function renderSetup() {
     <div class="card pad stack" style="margin-top:20px">
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
         <div>
-          <div class="eyebrow">Step 2 \u00b7 Attendance</div>
+          <div class="eyebrow">Step 3 \u00b7 Attendance</div>
           <h2 style="margin-top:6px;font-size:22px">Participants &amp; roles</h2>
           <p class="muted small" style="margin-top:4px">Everyone is asked each question; the role responsible at that step is the one scored. Add each attendee and assign a role.</p>
         </div>
@@ -324,7 +350,7 @@ function renderSetup() {
 
     <div class="card pad stack" style="margin-top:20px">
       <div>
-        <div class="eyebrow">Step 3 \u00b7 Scenario</div>
+        <div class="eyebrow">Step 4 \u00b7 Scenario</div>
         <h2 style="margin-top:6px;font-size:22px">Generate the exercise</h2>
       </div>
       <div id="scenChoice"></div>
@@ -346,6 +372,33 @@ function renderSetup() {
   bind("#f-fname", v => S.facilitator.name = v);
   bind("#f-fpos", v => S.facilitator.position = v);
   bind("#f-femail", v => S.facilitator.email = v);
+
+  // Step 1 · Procedure — bind to CFG and persist
+  const bindCfg = (id, fn) => { const e = $(id); if (e) e.oninput = () => { fn(e.value); saveConfig(CFG); }; };
+  bindCfg("#f-org", v => { CFG.facility.name = v; CFG.org.name = v; });
+  bindCfg("#f-plan", v => CFG.facility.planTitle = v);
+  bindCfg("#f-loc", v => CFG.facility.location = v);
+  bindCfg("#f-ref", v => CFG.facility.planRef = v);
+  bindCfg("#f-ftype", v => CFG.facility.type = v);
+  bindCfg("#f-plantext", v => CFG.facility.planText = v);
+  const fpf = $("#f-planfile");
+  if (fpf) fpf.onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const st = $("#f-planstate");
+    if (st) st.textContent = `Reading ${file.name}…`;
+    try {
+      const text = await extractTextFromFile(file);
+      if (!text) throw new Error("empty");
+      $("#f-plantext").value = text;
+      CFG.facility.planText = text;
+      saveConfig(CFG);
+      if (st) st.textContent = `${(text.length/1000).toFixed(1)}k characters from ${file.name}`;
+      toast("Procedure loaded");
+    } catch (err) {
+      if (st) st.textContent = "Couldn't read that file — paste the text instead";
+      toast("Couldn't read that file");
+    }
+  };
 
   $("#addP").onclick = () => { S.participants.push({ id: uid(), name: "", email: "", roleId: CFG.roles[0].id }); saveSession(); renderParticipants(); };
   $("#resetAll").onclick = () => {
@@ -626,26 +679,24 @@ function openSettings() {
       </div>
     </div>
     <div>
-      <div class="eyebrow">Facility &amp; plan</div>
+      <div class="eyebrow">Organisation &amp; procedure</div>
       <div class="grid-2" style="margin-top:10px">
-        <label class="field"><span class="lab">Facility name</span><input type="text" id="s-fac" value="${esc(CFG.facility.name)}"></label>
-        <label class="field"><span class="lab">Location</span><input type="text" id="s-loc" value="${esc(CFG.facility.location)}"></label>
-        <label class="field"><span class="lab">Plan title</span><input type="text" id="s-plan" value="${esc(CFG.facility.planTitle)}"></label>
-        <label class="field"><span class="lab">Plan reference</span><input type="text" id="s-ref" value="${esc(CFG.facility.planRef)}"></label>
-        <label class="field"><span class="lab">PFSO name</span><input type="text" id="s-pfso" value="${esc(CFG.pfso.name)}"></label>
-        <label class="field"><span class="lab">PFSO position</span><input type="text" id="s-pfsopos" value="${esc(CFG.pfso.position)}"></label>
+        <label class="field"><span class="lab">Organisation name</span><input type="text" id="s-fac" value="${esc(CFG.facility.name)}" placeholder="e.g. Acme Operations Ltd"></label>
+        <label class="field"><span class="lab">Location</span><input type="text" id="s-loc" value="${esc(CFG.facility.location)}" placeholder="e.g. Site / city"></label>
+        <label class="field"><span class="lab">SOP / procedure title</span><input type="text" id="s-plan" value="${esc(CFG.facility.planTitle)}" placeholder="e.g. Emergency Response SOP"></label>
+        <label class="field"><span class="lab">Document reference <span class="muted">(optional)</span></span><input type="text" id="s-ref" value="${esc(CFG.facility.planRef)}" placeholder="e.g. SOP-014 Rev 3"></label>
       </div>
       <label class="field" style="margin-top:12px"><span class="lab">Facility type</span>
         <input type="text" id="s-ftype" value="${esc(CFG.facility.type||'')}" placeholder="e.g. marine bulk LPG terminal with a remote sea berth">
         <span class="hint">Describe what kind of facility this is, in plain words, so AI-generated scenarios match it instead of assuming a generic oil terminal.</span>
       </label>
       <div class="field" style="margin-top:12px">
-        <span class="lab">Your security plan / procedure (for AI grounding)</span>
+        <span class="lab">Upload the procedure you would like to rehearse</span>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 8px">
           <input type="file" id="s-planfile" accept=".pdf,.docx,.txt,.md,.csv,application/pdf" style="flex:1;min-width:220px">
           <span class="muted small" id="s-planstate">${CFG.facility.planText ? `${(CFG.facility.planText.length/1000).toFixed(1)}k characters loaded` : "No plan loaded"}</span>
         </div>
-        <textarea id="s-plantext" rows="6" placeholder="Upload a PDF or Word (.docx) document above and its text appears here — or paste/edit the plan text directly. The AI grounds every model answer and plan reference in this text.">${esc(CFG.facility.planText||'')}</textarea>
+        <textarea id="s-plantext" rows="6" placeholder="Upload a PDF or Word (.docx) document above and its text appears here — or paste/edit the procedure text directly. The AI grounds every model answer and reference in this text.">${esc(CFG.facility.planText||'')}</textarea>
         <span class="hint">Files are read in your browser only — nothing is uploaded to a server. PDFs and Word docs are converted to text automatically; you can trim the result before saving.</span>
       </div>
     </div>
@@ -719,8 +770,6 @@ function openSettings() {
     CFG.facility.planRef = $("#s-ref").value;
     CFG.facility.type = $("#s-ftype").value;
     CFG.facility.planText = $("#s-plantext").value;
-    CFG.pfso.name = $("#s-pfso").value;
-    CFG.pfso.position = $("#s-pfsopos").value;
     TTS.setEnabled($("#s-tts").checked);
     TTS.setAutoRead($("#s-auto").checked);
     if (vsel.value && !vsel.value.includes("Loading")) TTS.setVoice(vsel.value);
