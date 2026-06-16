@@ -207,7 +207,13 @@ function wireTopbar() {
   const home = $("#homeBtn");
   if (home) home.onclick = () => { if (S.mode === "participant") return; S.step = "setup"; saveSession(); render(); };
   const tg = $("#ttsToggle");
-  if (tg) tg.onclick = () => { TTS.setEnabled(!TTS.isEnabled()); render(); };
+  if (tg) tg.onclick = () => {
+    const now = !TTS.isEnabled();
+    TTS.setEnabled(now);            // setEnabled(false) cancels any speech in progress
+    tg.classList.toggle("active", now);
+    tg.innerHTML = now ? ICON.mic : ICON.micOff;
+    tg.title = `AI voiceover ${now ? "on" : "off"}`;
+  };
   const os = $("#openSettings");
   if (os) os.onclick = openSettings;
 }
