@@ -191,7 +191,7 @@ function renderTopbar() {
     : `<span class="logo">${esc((CFG.org.name||"PF")[0])}</span>`;
   const showLevel = S.step === "drill" || S.step === "brief" || S.step === "results";
   return `<div class="topbar">
-    <div class="brand">${logo}
+    <div class="brand" id="homeBtn" style="cursor:pointer" title="Back to setup">${logo}
       <div><div class="name">${esc(CFG.org.name || "Port Facility")}</div>
       <div class="sub">${esc(CFG.facility.name)} \u00b7 Tabletop Drill Facilitator</div></div>
     </div>
@@ -204,6 +204,8 @@ function renderTopbar() {
   </div>`;
 }
 function wireTopbar() {
+  const home = $("#homeBtn");
+  if (home) home.onclick = () => { if (S.mode === "participant") return; S.step = "setup"; saveSession(); render(); };
   const tg = $("#ttsToggle");
   if (tg) tg.onclick = () => { TTS.setEnabled(!TTS.isEnabled()); render(); };
   const os = $("#openSettings");
