@@ -92,7 +92,17 @@ Rules: exactly ${opts.count} injects, progressing through the phases in order; v
         messages: [{ role: "user", content: prompt }]
       })
     });
-    if (!res.ok) throw new Error("API " + res.status);
+    if (!res.ok) {
+      let detail = "";
+      try { const j = await res.json(); detail = (j && j.error && j.error.message) || ""; } catch (e) {}
+      let msg;
+      if (res.status === 401) msg = "Your API key was rejected — check it's pasted correctly (starts with sk-ant-).";
+      else if (res.status === 400 && /credit|balance/i.test(detail)) msg = "Your Anthropic account has no credit yet — add credit in console.anthropic.com → Billing.";
+      else if (res.status === 429) msg = "Anthropic is rate-limiting or you're out of credit — add credit and try again in a moment.";
+      else if (res.status === 529) msg = "Anthropic is temporarily overloaded — try again in a minute.";
+      else msg = `Anthropic error ${res.status}${detail ? ": " + detail : ""}`;
+      const err = new Error(msg); err.userMessage = msg; throw err;
+    }
     const data = await res.json();
     return (data.content && data.content[0] && data.content[0].text) || "";
   }
@@ -166,6 +176,40 @@ Use the titles the procedure actually uses. Return ONLY the JSON array.`;
     return id;
   }
 
+  // ---- generate a MENU of specific scenarios (stubs) from the procedure ----
+  function buildMenuPrompt(cfg, procedureText, count) {
+    const setting = cfg.facility.type || cfg.facility.name || "the organisation";
+    const extract = (procedureText || "").trim().slice(0, 11000);
+    const block = extract ? `PROCEDURE EXTRACT:\n"""${extract}"""` : `No procedure text was provided; infer sensible scenarios for the setting.`;
+    return `You design tabletop exercises. From the procedure below, identify the distinct EMERGENCIES / INCIDENTS / SITUATIONS it covers that a team should rehearse — the specific events this document tells people how to handle.
+
+SETTING: ${setting}
+${block}
+
+Return a JSON array ONLY (no prose, no markdown) of ${count} distinct scenarios actually covered by this procedure, each:
+{ "title": "short scenario title", "category": "type of incident", "synopsis": "1-2 sentence description of the situation" }
+Base them on what the procedure actually addresses — do not invent unrelated incident types. Return ONLY the JSON array.`;
+  }
+
+  async function generateScenarioMenu(cfg, procedureText, opts = {}) {
+    const count = opts.count || 10;
+    const prompt = buildMenuPrompt(cfg, procedureText, count);
+    let text;
+    if (hasBuiltIn()) text = await callBuiltIn(prompt);
+    else if (userKey()) text = await callAnthropic(prompt);
+    else throw new Error("AI not available");
+    let t = (text || "").trim().replace(/^```(json)?/i, "").replace(/```$/, "").trim();
+    const start = t.indexOf("["), end = t.lastIndexOf("]");
+    if (start === -1 || end === -1) throw new Error("no json");
+    const arr = JSON.parse(t.slice(start, end + 1));
+    if (!Array.isArray(arr) || !arr.length) throw new Error("empty");
+    return arr.filter(s => s && s.title).slice(0, 16).map(s => ({
+      title: String(s.title).slice(0, 90),
+      category: String(s.category || "").slice(0, 40),
+      synopsis: String(s.synopsis || "").slice(0, 240)
+    }));
+  }
+
   async function generateRoles(cfg, procedureText) {
     const prompt = buildRolesPrompt(cfg, procedureText);
     let text;
@@ -186,5 +230,5 @@ Use the titles the procedure actually uses. Return ONLY the JSON array.`;
     }));
   }
 
-  return { available, hasBuiltIn, generate, generateRoles, setKey, getKey };
+  return { available, hasBuiltIn, generate, generateRoles, generateScenarioMenu, setKey, getKey };
 })();

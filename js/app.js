@@ -5,7 +5,26 @@
    ============================================================ */
 
 let CFG = loadConfig();
+let LIB = loadLibraries();
 let PROCEDURE_TEXT = ""; // optional, used only for live-AI mode
+
+/* ---- scenario-library helpers ---- */
+function curSig() { return planSig(CFG.facility.planText || ""); }
+function activeFolder() {
+  // explicit selection wins; else the folder matching the current procedure
+  if (S && S.libFolderId) { const f = LIB.folders.find(x => x.id === S.libFolderId); if (f) return f; }
+  return LIB.folders.find(f => f.sig === curSig()) || null;
+}
+function ensureFolderForCurrent(meta) {
+  const sig = curSig();
+  let f = LIB.folders.find(x => x.sig === sig);
+  if (!f) { f = { id: "fold-" + Date.now(), sig, createdISO: new Date().toISOString(), scenarios: [] }; LIB.folders.push(f); }
+  f.title = (meta && meta.title) || CFG.facility.planTitle || "Untitled procedure";
+  f.ref = (meta && meta.ref) || CFG.facility.planRef || "";
+  f.setting = CFG.facility.type || "";
+  f.planText = CFG.facility.planText || "";
+  return f;
+}
 
 /* ---------------- helpers ---------------- */
 const $  = (sel, root = document) => root.querySelector(sel);
@@ -82,6 +101,7 @@ const ICON = {
   users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>',
   spark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"/></svg>',
+  key:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15L19 4M18 5l2 2M15 8l2 2"/></svg>',
   flag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>'
 };
 
@@ -117,6 +137,7 @@ function newSession() {
     participants: [],
     scenarioMode: "random",
     aiFocus: "",
+    libFolderId: null,
     pickId: null,
     injectCount: 10,
     difficulty: "standard",   // 'easy' | 'standard' | 'hard'
@@ -179,6 +200,33 @@ function resolveScenario() {
   S.scenario = scn;
   S.level = scn.startLevel || 1;
   S.cursor = 0;
+  S.answers = scn.injects.map(() => ({ given: null, revealed: false, individual: {} }));
+  saveSession();
+}
+
+// Build (and cache) a full scenario from a library stub. Generates injects
+// once via AI, then reuses the cached injects on subsequent runs.
+async function buildScenarioFromStub(folder, stub) {
+  if (!stub.injects || !stub.injects.length) {
+    const planText = folder.planText || CFG.facility.planText || "";
+    const scn = await AI.generate(CFG, planText, {
+      count: S.injectCount, difficulty: S.difficulty,
+      focus: stub.title + (stub.synopsis ? " — " + stub.synopsis : "")
+    });
+    stub.injects = scn.injects;
+    stub.startLevel = scn.startLevel || 1;
+    if (!stub.setup) stub.setup = scn.setup || "";
+    saveLibraries(LIB);
+  }
+  const scn = {
+    id: stub.id, title: stub.title, category: stub.category,
+    synopsis: stub.synopsis, setup: stub.setup || "",
+    startLevel: stub.startLevel || 1,
+    injects: structuredClone(stub.injects).slice(0, S.injectCount)
+  };
+  S.vars = buildVars();
+  shuffleScenarioOptions(scn);
+  S.scenario = scn; S.level = scn.startLevel || 1; S.cursor = 0;
   S.answers = scn.injects.map(() => ({ given: null, revealed: false, individual: {} }));
   saveSession();
 }
@@ -303,6 +351,7 @@ function renderSetup() {
         <h2 style="margin-top:6px;font-size:22px">What are we rehearsing?</h2>
         <p class="muted small" style="margin-top:4px">Name the organisation and the procedure, then upload the document. Scenarios &amp; model answers are generated from this.</p>
       </div>
+      ${AI.hasBuiltIn() ? "" : `<div id="aiKeyBar"></div>`}
       <div class="grid-2">
         <label class="field"><span class="lab">Organisation name</span><input type="text" id="f-org" value="${esc(CFG.facility.name)}" placeholder="e.g. Acme Operations Ltd"></label>
         <label class="field"><span class="lab">SOP / procedure title</span><input type="text" id="f-plan" value="${esc(CFG.facility.planTitle)}" placeholder="e.g. Emergency Response SOP"></label>
@@ -331,6 +380,16 @@ function renderSetup() {
         </div>
         <div id="rolesEditor" style="margin-top:12px"></div>
         <button class="btn sm ghost" id="addRole" type="button" style="margin-top:10px">${ICON.plus} Add role</button>
+      </div>
+      <div class="field" style="border-top:1px solid var(--line-soft);padding-top:16px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <span class="lab" style="font-size:14px">Scenario library</span>
+            <span class="hint" style="margin-top:2px">Build a set of specific scenarios from this procedure (done once, then saved). You'll pick from them in Step 4.</span>
+          </div>
+          <button class="btn sm" id="genLibProc" type="button">${ICON.spark} Generate scenarios</button>
+        </div>
+        <div id="procLibStatus" style="margin-top:10px"></div>
       </div>
     </div>
 
@@ -405,7 +464,9 @@ function renderSetup() {
       CFG.facility.planText = text;
       saveConfig(CFG);
       if (st) st.textContent = `${(text.length/1000).toFixed(1)}k characters from ${file.name}`;
-      toast("Procedure loaded");
+      if (text.trim().length < 200) { toast("Very little text found — if this is a scanned/photo PDF, paste the text in manually instead"); }
+      else { toast("Procedure loaded"); }
+      renderProcLibStatus();
     } catch (err) {
       if (st) st.textContent = "Couldn't read that file — paste the text instead";
       toast("Couldn't read that file");
@@ -433,10 +494,16 @@ function renderSetup() {
       CFG.roles = roles; saveConfig(CFG); renderRolesEditor(); renderParticipants();
       toast(`Suggested ${roles.length} roles — edit as needed`);
     } catch (e) {
-      toast("Couldn't generate roles — add them manually");
+      toast(e.userMessage || "Couldn't generate roles — check your key & that the procedure has readable text");
     }
     genRolesBtn.disabled = false; genRolesBtn.innerHTML = old;
   };
+
+  // Step 1 · Procedure — scenario library
+  renderProcLibStatus();
+  renderAiKeyBar();
+  const genLibProcBtn = $("#genLibProc");
+  if (genLibProcBtn) genLibProcBtn.onclick = () => generateLibrary("#genLibProc");
 
   $("#addP").onclick = () => { if (!CFG.roles.length) { toast("Add at least one response role first"); return; } S.participants.push({ id: uid(), name: "", email: "", roleId: CFG.roles[0].id }); saveSession(); renderParticipants(); };
   $("#resetAll").onclick = () => {
@@ -514,26 +581,28 @@ function renderParticipants() {
 function renderScenarioChoice() {
   const box = $("#scenChoice"); if (!box) return;
   const aiOn = AI.available();
+  const folder = activeFolder();
+  const libN = folder ? (folder.scenarios || []).length : 0;
   box.innerHTML = `
     <div class="grid-2" style="gap:12px">
       <div class="card" style="box-shadow:none;cursor:pointer;border-width:1.5px" data-mode="random">
         <div class="card-body" style="padding:18px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span class="chip">${ICON.shield} Recommended</span></div>
-          <h4 style="font-size:16px">Random pre-built scenario</h4>
-          <p class="muted small" style="margin-top:5px">Works fully offline. Pulls a fresh, elaborate scenario from the library and randomises vessel, cargo, time &amp; conditions so each run differs.</p>
+          <h4 style="font-size:16px">Surprise me</h4>
+          <p class="muted small" style="margin-top:5px">${libN ? `Runs a random scenario from your procedure’s library of ${libN}.` : "Runs a random scenario from the built-in library."}</p>
         </div>
       </div>
       <div class="card" style="box-shadow:none;cursor:pointer;border-width:1.5px" data-mode="pick">
         <div class="card-body" style="padding:18px">
           <h4 style="font-size:16px">Choose a specific scenario</h4>
-          <p class="muted small" style="margin-top:5px">Pick the threat type you want to rehearse from the ${SCENARIOS.length}-scenario library.</p>
+          <p class="muted small" style="margin-top:5px">${libN ? `Pick from the ${libN} scenarios generated from your procedure.` : "Generate a scenario library from your uploaded procedure, then pick one."}</p>
         </div>
       </div>
       <div class="card" style="box-shadow:none;cursor:${aiOn?'pointer':'not-allowed'};opacity:${aiOn?1:.55};border-width:1.5px" data-mode="ai">
         <div class="card-body" style="padding:18px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span class="chip">${ICON.spark} Live AI</span></div>
           <h4 style="font-size:16px">Generate a new scenario with AI</h4>
-          <p class="muted small" style="margin-top:5px">${aiOn ? "Generates a brand-new scenario grounded in your plan." : "Add an Anthropic API key in Settings to enable when self-hosted."}</p>
+          <p class="muted small" style="margin-top:5px">${aiOn ? "Generates a brand-new one-off scenario grounded in your procedure." : "Add an Anthropic API key in Settings to enable when self-hosted."}</p>
         </div>
       </div>
     </div>
@@ -590,12 +659,44 @@ function renderScenarioChoice() {
     const w = $("#pickWrap"); if (!w) return;
     renderAiFocus();
     if (S.scenarioMode !== "pick") { w.innerHTML = ""; return; }
-    w.innerHTML = `<div class="stack" style="gap:10px">` + SCENARIOS.map(s => `
-      <label class="opt ${S.pickId===s.id?'selected':''}" data-id="${s.id}" style="cursor:pointer">
-        <span class="key">${ICON.anchor}</span>
-        <span><strong>${esc(s.title)}</strong><br><span class="muted small">${esc(s.synopsis)}</span></span>
-      </label>`).join("") + `</div>`;
-    $$("[data-id]", w).forEach(el => el.onclick = () => { S.pickId = el.dataset.id; saveSession(); renderPickList(); });
+
+    const folder = activeFolder();
+    const aiOn = AI.available();
+    // folder selector (if the user has libraries from more than one procedure)
+    const folderPicker = LIB.folders.length > 1 ? `
+      <div class="field" style="margin-bottom:12px">
+        <span class="lab">Procedure library</span>
+        <select id="folderSel">
+          ${LIB.folders.map(f => `<option value="${f.id}" ${activeFolder()&&activeFolder().id===f.id?"selected":""}>${esc(f.title||"Untitled")}${f.ref?` · ${esc(f.ref)}`:""} (${(f.scenarios||[]).length})</option>`).join("")}
+        </select>
+      </div>` : "";
+
+    const genBtn = `<button class="btn sm" id="genLib" type="button" ${aiOn?"":"disabled"}>${ICON.spark} ${folder&&(folder.scenarios||[]).length?"Regenerate":"Generate"} scenarios from procedure</button>`;
+
+    if (!folder || !(folder.scenarios || []).length) {
+      w.innerHTML = folderPicker + `
+        <div class="empty" style="padding:18px;text-align:center">
+          <p class="muted" style="margin-bottom:12px">No scenario library yet for this procedure. Generate one from your uploaded document — it builds a menu of the specific situations your procedure covers (done once, then saved).</p>
+          ${genBtn}
+          ${aiOn?"":`<p class="hint" style="margin-top:8px">Add an Anthropic API key in Settings to enable generation.</p>`}
+        </div>`;
+    } else {
+      w.innerHTML = folderPicker + `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="muted small">${(folder.scenarios||[]).length} scenarios from <strong>${esc(folder.title||"your procedure")}</strong></span>
+          ${genBtn}
+        </div>
+        <div class="stack" style="gap:10px">` + folder.scenarios.map(s => `
+        <label class="opt ${S.pickId===s.id?'selected':''}" data-id="${s.id}" style="cursor:pointer">
+          <span class="key">${ICON.anchor}</span>
+          <span><strong>${esc(s.title)}</strong>${s.category?` <span class="tag">${esc(s.category)}</span>`:""}${s.injects?` <span class="muted small">· ready</span>`:""}<br><span class="muted small">${esc(s.synopsis||"")}</span></span>
+        </label>`).join("") + `</div>`;
+      $$("[data-id]", w).forEach(el => el.onclick = () => { S.pickId = el.dataset.id; saveSession(); renderPickList(); });
+    }
+
+    const fs = $("#folderSel");
+    if (fs) fs.onchange = () => { S.libFolderId = fs.value; S.pickId = null; saveSession(); renderPickList(); renderScenarioChoice && renderScenarioChoice(); };
+    const gl = $("#genLib");
+    if (gl) gl.onclick = () => generateLibrary("#genLib");
   }
 
   function renderAiFocus() {
@@ -609,12 +710,81 @@ function renderScenarioChoice() {
   }
 }
 
+function renderAiKeyBar() {
+  const w = $("#aiKeyBar"); if (!w) return;
+  const hasKey = !!AI.getKey();
+  if (hasKey) {
+    w.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid var(--ok);background:var(--ok-bg);border-radius:var(--radius-sm);margin-bottom:16px">
+      <span style="color:var(--ok);display:flex">${ICON.check}</span>
+      <span style="font-size:13.5px;font-weight:600">AI connected</span>
+      <span class="muted small">Roles &amp; scenarios can be generated.</span>
+      <button class="btn sm ghost" id="aiKeyChange" type="button" style="margin-left:auto">Change key</button>
+    </div>`;
+    $("#aiKeyChange").onclick = () => { AI.setKey(""); renderAiKeyBar(); renderRolesEditor(); renderProcLibStatus(); renderScenarioChoice(); };
+  } else {
+    w.innerHTML = `<div style="padding:13px 15px;border:1px solid var(--line);background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">
+        <span style="color:var(--primary);display:flex">${ICON.key}</span>
+        <span style="font-size:13.5px;font-weight:600">Connect AI to generate roles &amp; scenarios</span>
+      </div>
+      <input type="password" id="aiKeyInput" placeholder="Paste your Anthropic API key (sk-ant-…)" autocomplete="off" style="width:100%">
+      <span class="hint" style="margin-top:6px">Stored only in this browser — never uploaded. Get a key at <span class="mono">console.anthropic.com</span>. Without it you can still run pre-built scenarios.</span>
+    </div>`;
+    const inp = $("#aiKeyInput");
+    if (inp) inp.onchange = () => {
+      const v = inp.value.trim();
+      if (!v) return;
+      AI.setKey(v);
+      renderAiKeyBar(); renderRolesEditor(); renderProcLibStatus(); renderScenarioChoice();
+      toast("AI connected");
+    };
+  }
+}
+
+function renderProcLibStatus() {
+  const w = $("#procLibStatus"); if (!w) return;
+  const folder = LIB.folders.find(f => f.sig === curSig());
+  const n = folder ? (folder.scenarios || []).length : 0;
+  if (!n) { w.innerHTML = `<span class="muted small">No scenarios generated yet for this procedure.</span>`; return; }
+  w.innerHTML = `<div class="muted small" style="margin-bottom:8px">${n} scenario${n>1?"s":""} ready — pick one in Step 4, or run “Surprise me”.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${folder.scenarios.map(s=>`<span class="tag" style="background:var(--surface-2)">${esc(s.title)}</span>`).join("")}</div>`;
+}
+
+async function generateLibrary(btnSel) {
+  if (!AI.available()) { toast("Add an Anthropic API key in Settings to generate scenarios"); openSettings(); return; }
+  const planText = ($("#f-plantext") && $("#f-plantext").value) || CFG.facility.planText || "";
+  if (!planText.trim()) { toast("Upload or paste your procedure first (Step 1)"); return; }
+  const gl = btnSel ? $(btnSel) : null; const old = gl ? gl.innerHTML : "";
+  if (gl) { gl.disabled = true; gl.innerHTML = "Generating scenarios…"; }
+  try {
+    const menu = await AI.generateScenarioMenu(CFG, planText, { count: 10 });
+    const folder = ensureFolderForCurrent();
+    const prev = {}; (folder.scenarios || []).forEach(s => { if (s.injects) prev[s.title] = s; });
+    folder.scenarios = menu.map((s, i) => {
+      const keep = prev[s.title];
+      return { id: "scn-" + Date.now() + "-" + i, title: s.title, category: s.category, synopsis: s.synopsis,
+               injects: keep ? keep.injects : null, startLevel: keep ? keep.startLevel : null, setup: keep ? keep.setup : "" };
+    });
+    saveLibraries(LIB);
+    S.libFolderId = folder.id; S.pickId = null; saveSession();
+    renderScenarioChoice();
+    renderProcLibStatus();
+    toast(`Generated ${menu.length} scenarios for this procedure`);
+  } catch (e) {
+    toast(e.userMessage || "Couldn't generate scenarios — check your key & that the procedure has readable text");
+    if (gl) { gl.disabled = false; gl.innerHTML = old; }
+  }
+}
+
 async function goToBrief() {
   if (!S.facilitator.name.trim()) { toast("Enter the facilitator's name"); $("#f-fname")?.focus(); return; }
   if (S.sessionMode !== "live") {
     if (S.participants.length === 0) { toast("Add at least one participant"); return; }
     if (S.participants.some(p => !p.name.trim())) { toast("Every participant needs a name"); return; }
   }
+
+  const folder = activeFolder();
+  const libScenarios = folder ? (folder.scenarios || []) : [];
 
   if (S.scenarioMode === "ai") {
     const btn = $("#toBrief"); const old = btn.innerHTML;
@@ -629,6 +799,20 @@ async function goToBrief() {
     } catch (e) {
       toast("AI generation failed \u2014 using a pre-built scenario");
       S.scenarioMode = "random"; resolveScenario();
+    }
+    btn.disabled = false; btn.innerHTML = old;
+  } else if (libScenarios.length && (S.scenarioMode === "pick" || S.scenarioMode === "random")) {
+    // Run from this procedure's own library (generate injects once, then cached)
+    let stub = S.scenarioMode === "pick" ? libScenarios.find(s => s.id === S.pickId) : null;
+    if (!stub) stub = rnd(libScenarios);
+    const btn = $("#toBrief"); const old = btn.innerHTML;
+    const needGen = !stub.injects || !stub.injects.length;
+    if (needGen) { btn.disabled = true; btn.innerHTML = `Building \u201c${esc(stub.title)}\u201d\u2026`; }
+    try {
+      await buildScenarioFromStub(folder, stub);
+    } catch (e) {
+      toast(e.userMessage || "Couldn't build that scenario — check your key & that the procedure has readable text");
+      btn.disabled = false; btn.innerHTML = old; return;
     }
     btn.disabled = false; btn.innerHTML = old;
   } else {

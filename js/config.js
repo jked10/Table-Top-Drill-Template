@@ -96,6 +96,26 @@ function loadConfig() {
 function saveConfig(cfg) { localStorage.setItem("tdf_config", JSON.stringify(cfg)); }
 function resetConfig() { localStorage.removeItem("tdf_config"); }
 
+/* ---- Per-document scenario libraries ("folders") ----
+   Each uploaded procedure gets its own folder of generated scenarios,
+   keyed by a cheap signature of the procedure text so re-uploading the
+   same document reuses (rather than regenerates) its scenarios. */
+function loadLibraries() {
+  try { const l = JSON.parse(localStorage.getItem("tdf_libraries") || "null"); if (l && Array.isArray(l.folders)) return l; } catch (e) {}
+  return { folders: [] };
+}
+function saveLibraries(lib) {
+  try { localStorage.setItem("tdf_libraries", JSON.stringify(lib)); }
+  catch (e) { /* quota — drop oldest folder's cached injects and retry once */
+    try { (lib.folders||[]).forEach(f => (f.scenarios||[]).forEach(s => { if (s.injects) delete s.injects; })); localStorage.setItem("tdf_libraries", JSON.stringify(lib)); } catch (_) {}
+  }
+}
+function planSig(text) {
+  const t = (text || "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  return t.length + ":" + t.slice(0, 60) + ":" + t.slice(-60);
+}
+
 function deepMerge(base, over) {
   for (const k in over) {
     if (over[k] && typeof over[k] === "object" && !Array.isArray(over[k])) {
