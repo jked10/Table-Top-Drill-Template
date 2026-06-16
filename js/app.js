@@ -321,6 +321,17 @@ function renderSetup() {
         <textarea id="f-plantext" rows="5" placeholder="Upload a PDF or Word (.docx) document above and its text appears here — or paste/edit the procedure text directly. The AI grounds every model answer and reference in this text.">${esc(CFG.facility.planText||'')}</textarea>
         <span class="hint">Files are read in your browser only — nothing is uploaded to a server.</span>
       </div>
+      <div class="field" style="border-top:1px solid var(--line-soft);padding-top:16px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <span class="lab" style="font-size:14px">Response roles</span>
+            <span class="hint" style="margin-top:2px">The positions you'll assign people to and score. Generate them from your procedure, then edit freely.</span>
+          </div>
+          <button class="btn sm" id="genRoles" type="button">${ICON.spark} Generate from procedure</button>
+        </div>
+        <div id="rolesEditor" style="margin-top:12px"></div>
+        <button class="btn sm ghost" id="addRole" type="button" style="margin-top:10px">${ICON.plus} Add role</button>
+      </div>
     </div>
 
     <div class="card pad stack" id="setupCard" style="margin-top:20px">
@@ -401,7 +412,33 @@ function renderSetup() {
     }
   };
 
-  $("#addP").onclick = () => { S.participants.push({ id: uid(), name: "", email: "", roleId: CFG.roles[0].id }); saveSession(); renderParticipants(); };
+  // Step 1 · Procedure — roles editor
+  renderRolesEditor();
+  const addRoleBtn = $("#addRole");
+  if (addRoleBtn) addRoleBtn.onclick = () => {
+    let base = "role", id = base, n = 2; const taken = new Set(CFG.roles.map(r=>r.id));
+    while (taken.has(id)) { id = base + "_" + n; n++; }
+    CFG.roles.push({ id, name: "", short: "", desc: "" });
+    saveConfig(CFG); renderRolesEditor();
+  };
+  const genRolesBtn = $("#genRoles");
+  if (genRolesBtn) genRolesBtn.onclick = async () => {
+    if (!AI.available()) { toast("Add an Anthropic API key in Settings to generate roles"); openSettings(); return; }
+    const planText = ($("#f-plantext") && $("#f-plantext").value) || CFG.facility.planText || "";
+    if (!planText.trim()) { toast("Upload or paste your procedure first"); return; }
+    const old = genRolesBtn.innerHTML; genRolesBtn.disabled = true; genRolesBtn.innerHTML = "Generating roles…";
+    try {
+      const roles = await AI.generateRoles(CFG, planText);
+      if (!roles.length) throw new Error("none");
+      CFG.roles = roles; saveConfig(CFG); renderRolesEditor(); renderParticipants();
+      toast(`Suggested ${roles.length} roles — edit as needed`);
+    } catch (e) {
+      toast("Couldn't generate roles — add them manually");
+    }
+    genRolesBtn.disabled = false; genRolesBtn.innerHTML = old;
+  };
+
+  $("#addP").onclick = () => { if (!CFG.roles.length) { toast("Add at least one response role first"); return; } S.participants.push({ id: uid(), name: "", email: "", roleId: CFG.roles[0].id }); saveSession(); renderParticipants(); };
   $("#resetAll").onclick = () => {
     modal({ title: "Start a fresh session?", body: `<p class="muted">This clears the current participants, scenario and any answers recorded. Settings &amp; branding are kept.</p>`,
       foot: [ h(`<button class="btn" data-close>Cancel</button>`), (()=>{ const b=h(`<button class="btn danger">Yes, reset</button>`); b.onclick=()=>{ S = newSession(); clearSession(); closeModal(); render(); }; return b; })() ] });
@@ -431,6 +468,26 @@ function renderSetup() {
   $("#joinLive").onclick = () => { S.mode = "participant"; S.step = "join"; saveSession(); render(); };
   const heroStart = $("#heroStart");
   if (heroStart) heroStart.onclick = () => { const el = $("#setupCard"); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 16, behavior: "smooth" }); };
+}
+
+function renderRolesEditor() {
+  const box = $("#rolesEditor"); if (!box) return;
+  if (!CFG.roles.length) {
+    box.innerHTML = `<div class="empty" style="padding:14px">No roles yet. Generate them from your procedure, or add them manually.</div>`;
+    return;
+  }
+  box.innerHTML = "";
+  CFG.roles.forEach(r => {
+    const row = h(`<div class="rolerow" style="display:grid;grid-template-columns:1.1fr 0.7fr 2fr auto;gap:8px;align-items:start;margin-bottom:8px">
+      <input type="text" data-k="name" placeholder="Role title" value="${esc(r.name)}">
+      <input type="text" data-k="short" placeholder="Short" value="${esc(r.short||'')}">
+      <input type="text" data-k="desc" placeholder="What they do during the response" value="${esc(r.desc||'')}">
+      <button class="iconbtn del" title="Remove role" type="button">${ICON.trash}</button>
+    </div>`);
+    $$("[data-k]", row).forEach(inp => inp.oninput = () => { r[inp.dataset.k] = inp.value; saveConfig(CFG); });
+    $(".del", row).onclick = () => { CFG.roles = CFG.roles.filter(x => x.id !== r.id); saveConfig(CFG); renderRolesEditor(); renderParticipants(); };
+    box.append(row);
+  });
 }
 
 function renderParticipants() {

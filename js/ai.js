@@ -141,5 +141,50 @@ Rules: exactly ${opts.count} injects, progressing through the phases in order; v
   function setKey(k) { localStorage.setItem("tdf_anthropic_key", (k || "").trim()); }
   function getKey() { return userKey(); }
 
-  return { available, hasBuiltIn, generate, setKey, getKey };
+  // ---- generate a set of response roles from the uploaded procedure ----
+  function buildRolesPrompt(cfg, procedureText) {
+    const setting = cfg.facility.type || cfg.facility.name || "the organisation";
+    const extract = (procedureText || "").trim().slice(0, 9000);
+    const block = extract
+      ? `PROCEDURE EXTRACT:\n"""${extract}"""`
+      : `No procedure text was provided; infer sensible roles for the setting.`;
+    return `You design tabletop exercises. From the procedure below, identify the distinct PEOPLE / POSITIONS who have responsibilities during the response — the roles a facilitator would assign to participants and score.
+
+SETTING: ${setting}
+${block}
+
+Return a JSON array ONLY (no prose, no markdown) of 5-9 roles, most senior/important first, each:
+{ "name": "full role title", "short": "1-2 word label", "desc": "one sentence on what they do during the response" }
+Use the titles the procedure actually uses. Return ONLY the JSON array.`;
+  }
+
+  function slug(name, taken) {
+    let base = (name || "role").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "role";
+    let id = base, n = 2;
+    while (taken.has(id)) { id = base + "_" + n; n++; }
+    taken.add(id);
+    return id;
+  }
+
+  async function generateRoles(cfg, procedureText) {
+    const prompt = buildRolesPrompt(cfg, procedureText);
+    let text;
+    if (hasBuiltIn()) text = await callBuiltIn(prompt);
+    else if (userKey()) text = await callAnthropic(prompt);
+    else throw new Error("AI not available");
+    let t = (text || "").trim().replace(/^```(json)?/i, "").replace(/```$/, "").trim();
+    const start = t.indexOf("["), end = t.lastIndexOf("]");
+    if (start === -1 || end === -1) throw new Error("no json");
+    const arr = JSON.parse(t.slice(start, end + 1));
+    if (!Array.isArray(arr) || !arr.length) throw new Error("empty");
+    const taken = new Set();
+    return arr.filter(r => r && r.name).slice(0, 12).map(r => ({
+      id: slug(r.name, taken),
+      name: String(r.name).slice(0, 80),
+      short: String(r.short || r.name).slice(0, 20),
+      desc: String(r.desc || "").slice(0, 200)
+    }));
+  }
+
+  return { available, hasBuiltIn, generate, generateRoles, setKey, getKey };
 })();
