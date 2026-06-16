@@ -116,6 +116,7 @@ function newSession() {
     facilitator: { name: "", position: "Facilitator", email: "" },
     participants: [],
     scenarioMode: "random",
+    aiFocus: "",
     pickId: null,
     injectCount: 10,
     difficulty: "standard",   // 'easy' | 'standard' | 'hard'
@@ -480,6 +481,7 @@ function renderScenarioChoice() {
       </div>
     </div>
     <div id="pickWrap" style="margin-top:16px"></div>
+    <div id="aiFocusWrap" style="margin-top:16px"></div>
     <div class="field" style="margin-top:16px">
       <span class="lab">Difficulty</span>
       <div id="diffChoice" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
@@ -529,6 +531,7 @@ function renderScenarioChoice() {
 
   function renderPickList() {
     const w = $("#pickWrap"); if (!w) return;
+    renderAiFocus();
     if (S.scenarioMode !== "pick") { w.innerHTML = ""; return; }
     w.innerHTML = `<div class="stack" style="gap:10px">` + SCENARIOS.map(s => `
       <label class="opt ${S.pickId===s.id?'selected':''}" data-id="${s.id}" style="cursor:pointer">
@@ -536,6 +539,16 @@ function renderScenarioChoice() {
         <span><strong>${esc(s.title)}</strong><br><span class="muted small">${esc(s.synopsis)}</span></span>
       </label>`).join("") + `</div>`;
     $$("[data-id]", w).forEach(el => el.onclick = () => { S.pickId = el.dataset.id; saveSession(); renderPickList(); });
+  }
+
+  function renderAiFocus() {
+    const w = $("#aiFocusWrap"); if (!w) return;
+    if (S.scenarioMode !== "ai") { w.innerHTML = ""; return; }
+    w.innerHTML = `<label class="field"><span class="lab">Focus on a specific situation <span class="muted">(optional)</span></span>
+      <input type="text" id="f-focus" value="${esc(S.aiFocus||'')}" placeholder="e.g. Fire in the engine room — or leave blank for a general scenario">
+      <span class="hint">If your uploaded procedure covers many situations, name the one you want to rehearse and the whole scenario is built around it. Leave blank to let the AI pick.</span>
+    </label>`;
+    const fi = $("#f-focus"); if (fi) fi.oninput = e => { S.aiFocus = e.target.value; saveSession(); };
   }
 }
 
@@ -550,7 +563,7 @@ async function goToBrief() {
     const btn = $("#toBrief"); const old = btn.innerHTML;
     btn.disabled = true; btn.innerHTML = `Generating scenario\u2026`;
     try {
-      const scn = await AI.generate(CFG, CFG.facility.planText || PROCEDURE_TEXT, { count: S.injectCount, difficulty: S.difficulty });
+      const scn = await AI.generate(CFG, CFG.facility.planText || PROCEDURE_TEXT, { count: S.injectCount, difficulty: S.difficulty, focus: S.aiFocus });
       shuffleScenarioOptions(scn);
       S.vars = buildVars();
       S.scenario = scn; S.level = scn.startLevel || 1; S.cursor = 0;

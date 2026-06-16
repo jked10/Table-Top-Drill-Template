@@ -40,6 +40,28 @@ const ResultsScreen = (() => {
     });
   }
 
+  // Derive a per-person score from the team answers, by the role each person is assigned.
+  // Used when individual capture is OFF (single team answer per inject).
+  function computePerPersonDerived() {
+    const scn = S.scenario;
+    return S.participants.map(p => {
+      let answered = 0, correct = 0, pts = 0, max = 0, total = 0;
+      scn.injects.forEach((inj, idx) => {
+        if (inj.role !== p.roleId) return;
+        total++;
+        const ans = S.answers[idx];
+        const sc = DrillScreen.scoreOf(ans, inj);
+        max += sc.max;
+        if (ans && ans.given !== null && ans.given !== undefined) {
+          answered++;
+          pts += sc.pts;
+          if (sc.result === "ok") correct++;
+        }
+      });
+      return { p, answered, correct, pts, max, total, pct: max ? Math.round(pts/max*100) : 0 };
+    }).filter(r => r.total > 0 || true);
+  }
+
   function readiness(pct) {
     if (pct >= 85) return { label: "Strong \u2014 plan well understood", color: "var(--ok)", bg: "var(--ok-bg)" };
     if (pct >= 65) return { label: "Acceptable \u2014 some gaps to address", color: "oklch(0.5 0.12 60)", bg: "var(--warn-bg)" };
@@ -88,18 +110,25 @@ const ResultsScreen = (() => {
 
     const pp = computePerPerson();
     const anyIndividual = pp.some(r => r.answered > 0);
-    const perPersonCard = (S.capturePerPerson && anyIndividual) ? `
+    const useDerived = !(S.capturePerPerson && anyIndividual);
+    const ppRows = useDerived ? computePerPersonDerived() : pp;
+    const ppNote = useDerived
+      ? `Each person's score reflects the team's answers on the injects their assigned role was responsible for.`
+      : `Each person's score reflects their own individual answers on every inject.`;
+    const totalInjects = S.scenario.injects.length;
+    const perPersonCard = (S.participants.length && ppRows.length) ? `
       <div class="card" style="margin-bottom:20px">
-        <div class="card-head"><h3 style="font-size:16px">${ICON.users} Individual results</h3></div>
+        <div class="card-head" style="display:block"><h3 style="font-size:16px">${ICON.users} Individual results</h3><p class="muted small" style="margin-top:4px">${ppNote}</p></div>
         <div class="card-body" style="padding:0;overflow-x:auto">
-          <table class="log"><thead><tr><th>Participant</th><th>Role</th><th style="text-align:center">Answered</th><th style="text-align:center">Correct</th><th style="text-align:center">Points</th><th style="min-width:140px">Score</th></tr></thead><tbody>
-          ${pp.sort((a,b)=>b.pct-a.pct).map(r => { const col = r.pct>=85?'var(--ok)':r.pct>=65?'var(--warn)':'var(--bad)';
+          <table class="log"><thead><tr><th>Participant</th><th>Assigned role</th><th style="text-align:center">${useDerived?'Injects':'Answered'}</th><th style="text-align:center">Correct</th><th style="text-align:center">Points</th><th style="min-width:140px">Score</th></tr></thead><tbody>
+          ${ppRows.slice().sort((a,b)=>b.pct-a.pct).map(r => { const col = r.pct>=85?'var(--ok)':r.pct>=65?'var(--warn)':'var(--bad)';
+            const denom = useDerived ? r.total : totalInjects;
             return `<tr><td><strong>${esc(r.p.name||'\u2014')}</strong>${r.p.email?`<br><span class="muted" style="font-size:11px">${esc(r.p.email)}</span>`:''}</td>
-              <td>${esc(roleById(CFG,r.p.roleId).short)}</td>
-              <td style="text-align:center">${r.answered}/${S.scenario.injects.length}</td>
+              <td>${esc(roleById(CFG,r.p.roleId).name)}</td>
+              <td style="text-align:center">${r.answered}/${denom}</td>
               <td style="text-align:center">${r.correct}</td>
               <td style="text-align:center">${r.pts}/${r.max}</td>
-              <td><div style="display:flex;align-items:center;gap:8px"><div class="rb-track" style="flex:1"><div class="rb-fill" style="width:${r.pct}%;background:${col}"></div></div><span class="mono" style="font-size:12px;color:var(--muted)">${r.pct}%</span></div></td></tr>`;
+              <td>${r.max ? `<div style="display:flex;align-items:center;gap:8px"><div class="rb-track" style="flex:1"><div class="rb-fill" style="width:${r.pct}%;background:${col}"></div></div><span class="mono" style="font-size:12px;color:var(--muted)">${r.pct}%</span></div>` : `<span class="muted small">No scored injects for this role</span>`}</td></tr>`;
           }).join('')}
           </tbody></table>
         </div>
@@ -163,7 +192,7 @@ const ResultsScreen = (() => {
         </div>
         <label style="display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-size:14px;font-weight:600;cursor:pointer">
           <input type="checkbox" id="so-attest" ${S.signoff.attest?"checked":""} style="width:auto;margin-top:3px">
-          <span>I confirm this ISPS tabletop drill was conducted on ${esc(fmtDate(S.dateISO))} at ${esc(CFG.facility.name)}, that the attendance and answers recorded are accurate, and that this record may be submitted for audit.</span>
+          <span>I confirm this tabletop drill was conducted on ${esc(fmtDate(S.dateISO))}${CFG.facility.name?` at ${esc(CFG.facility.name)}`:""}, that the attendance and answers recorded are accurate, and that this record may be submitted for audit.</span>
         </label>
         <div style="margin-top:16px">
           <span class="lab" style="font-size:13px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:6px">Signature</span>

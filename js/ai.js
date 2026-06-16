@@ -24,16 +24,21 @@ const AI = (() => {
       standard: "DIFFICULTY = STANDARD. Make the wrong options genuinely plausible so the responsible role must actually know the plan to choose well. Give exactly 4 options.",
       hard:     "DIFFICULTY = HARD. Make ALL options sound defensible; the distinction between them must be subtle (timing, correct sequence, who has authority, who to notify first, what to do before what). Avoid any obviously-wrong or absurd option. Give exactly 5 options."
     }[diff] || "DIFFICULTY = STANDARD. Make the wrong options plausible. Give exactly 4 options.";
-    const facilityType = cfg.facility.type || "port facility";
+    const facilityType = cfg.facility.type || "organisation";
     const planExtract = (procedureText || "").trim();
     const planBlock = planExtract
-      ? `PLAN EXTRACT (ground every model answer in THIS text and cite its sections in "ref"):\n"""${planExtract.slice(0, 9000)}"""`
-      : `No plan text was provided. Base model answers on standard ISPS Code PFSP good practice appropriate to the facility type above, and keep "ref" generic (e.g. "PFSP — communications").`;
+      ? `PROCEDURE EXTRACT (ground every model answer in THIS text and cite its sections in "ref"):\n"""${planExtract.slice(0, 9000)}"""`
+      : `No procedure text was provided. Base model answers on widely-accepted good practice appropriate to the setting above, and keep "ref" generic.`;
+    const focus = (opts.focus || "").trim();
+    const focusBlock = focus
+      ? `\nFOCUS: Build the ENTIRE scenario around this specific situation/response: "${focus}". Every inject must relate to handling this. Draw the correct actions from the matching part of the procedure extract.`
+      : "";
+    const planTitle = cfg.facility.planTitle || "the procedure";
 
-    return `You are an ISPS Code tabletop-exercise designer. Invent ONE fresh, elaborate, realistic tabletop drill scenario tailored to the SPECIFIC facility described below. Do NOT assume a generic oil/fuel terminal — honour the facility type and plan exactly (e.g. cargo handled, where the ship–shore interface is, when security measures apply).
+    return `You are a tabletop-exercise designer. Invent ONE fresh, elaborate, realistic tabletop drill scenario tailored to the SPECIFIC organisation and procedure described below. Honour the setting and procedure exactly — do not assume an industry that isn't described.
 
-FACILITY TYPE: ${facilityType}
-FACILITY: ${cfg.facility.name}, ${cfg.facility.location}. Standard: ${cfg.facility.standard}. Plan: ${cfg.facility.planTitle}.
+SETTING: ${facilityType}
+ORGANISATION: ${cfg.facility.name || "(unnamed)"}${cfg.facility.location?", "+cfg.facility.location:""}. Procedure: ${planTitle}.${focusBlock}
 
 AVAILABLE ROLES (use these exact ids for "role"):
 ${roleList}
@@ -45,10 +50,10 @@ ${diffGuide}
 Produce a JSON object ONLY (no prose, no markdown fences) with this exact shape:
 {
  "title": "short scenario title",
- "category": "threat category",
+ "category": "situation category",
  "startLevel": 1,
  "synopsis": "1-2 sentence overview",
- "setup": "2-3 sentence situation brief, present tense, specific to this facility",
+ "setup": "2-3 sentence situation brief, present tense, specific to this organisation",
  "injects": [
    {
      "phase": "Detection|Notification|Assessment|Response|Escalation|Recovery",
@@ -57,13 +62,13 @@ Produce a JSON object ONLY (no prose, no markdown fences) with this exact shape:
      "q": "the decision question for the responsible role",
      "options": ["the single best option", "wrong/weaker option", "wrong/weaker option", "wrong/weaker option"],
      "correct": 0,
-     "rationale": "why, citing what the plan requires",
-     "ref": "plan section reference",
+     "rationale": "why, citing what the procedure requires",
+     "ref": "procedure section reference",
      "points": 10
    }
  ]
 }
-Rules: exactly ${opts.count} injects, progressing through the phases in order; vary the responsible role across injects; the correct option must reflect the plan/profile. ALWAYS put the single best option FIRST with "correct": 0 (the app reshuffles option order itself). Keep options concise. Return ONLY the JSON object.`;
+Rules: exactly ${opts.count} injects, progressing through the phases in order; vary the responsible role across injects; the correct option must reflect the procedure. ALWAYS put the single best option FIRST with "correct": 0 (the app reshuffles option order itself). Keep options concise. Return ONLY the JSON object.`;
   }
 
   async function callBuiltIn(prompt) {
@@ -124,7 +129,7 @@ Rules: exactly ${opts.count} injects, progressing through the phases in order; v
   }
 
   async function generate(cfg, procedureText, opts = {}) {
-    const prompt = buildPrompt(cfg, procedureText, { count: opts.count || 10, difficulty: opts.difficulty });
+    const prompt = buildPrompt(cfg, procedureText, { count: opts.count || 10, difficulty: opts.difficulty, focus: opts.focus });
     let text;
     if (hasBuiltIn()) text = await callBuiltIn(prompt);
     else if (userKey()) text = await callAnthropic(prompt);
