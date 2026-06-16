@@ -108,13 +108,12 @@ const DrillScreen = (() => {
 
     let _speaking = false;
     const _replay = $("#replay");
-    function _syncReplay() { if (!_replay) return; _replay.classList.toggle("active", _speaking); _replay.title = _speaking ? "Stop voiceover" : "Play voiceover"; }
-    if (_replay) _replay.onclick = () => { if (_speaking) { TTS.cancel(); } else { speakInject(inject); } };
+    if (_replay) { _replay.title = "Replay voiceover"; _replay.onclick = () => speakInject(inject); }
     $("#prev").onclick = () => { if (S.cursor>0){ TTS.cancel(); S.cursor--; saveSession(); render(); } };
     $("#next").onclick = goNext;
     $("#endEarly").onclick = confirmEnd;
 
-    TTS.onState(state => { _speaking = (state==="speaking"); const ind=$("#speakInd"); if(ind) ind.style.display = _speaking?"inline-flex":"none"; _syncReplay(); });
+    TTS.onState(state => { _speaking = (state==="speaking"); const ind=$("#speakInd"); if(ind) ind.style.display = _speaking?"inline-flex":"none"; if(_replay) _replay.classList.toggle("active", _speaking); });
 
     // Auto-play narration on first visit to this inject (only if auto-read is on)
     if (TTS.isAutoRead() && !ans.revealed && ans.given === null && !ans._visited) { ans._visited = true; saveSession(); setTimeout(()=>speakInject(inject), 250); }

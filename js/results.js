@@ -56,7 +56,7 @@ const ResultsScreen = (() => {
   }
 
   function render() {
-    const scn = S.scenario; if (!scn) { S.step = "setup"; saveSession(); return render(); }
+    const scn = S.scenario; if (!scn) { S.step = "setup"; saveSession(); return window.render(); }
     const R = computeScores();
     const rd = readiness(R.pct);
 
@@ -182,14 +182,14 @@ const ResultsScreen = (() => {
 
     // donut animates via CSS; nothing to do here
 
-    $("#backDrill").onclick = () => { S.step = "drill"; saveSession(); render(); };
+    $("#backDrill").onclick = () => { S.step = "drill"; saveSession(); window.render(); };
     $("#newDrill").onclick = () => {
       modal({ title: "Start a new drill?",
         body: `<p class="muted">This report stays saved in your browser until you start a fresh session. To keep a permanent copy, use <strong>Report / PDF</strong> or <strong>Data file</strong> first.</p><p class="muted" style="margin-top:10px">What would you like to do?</p>`,
         foot: [
           h(`<button class="btn" data-close>Cancel</button>`),
-          (()=>{ const b=h(`<button class="btn">Re-run with a new scenario</button>`); b.onclick=()=>{ closeModal(); S.scenario=null; S.answers=[]; S.cursor=0; S.signoff={ name:"", position:"", attest:false, signature:"", signedISO:null }; S.notes=""; S.step="setup"; saveSession(); render(); }; return b; })(),
-          (()=>{ const b=h(`<button class="btn danger">Start completely fresh</button>`); b.onclick=()=>{ S = newSession(); clearSession(); closeModal(); render(); }; return b; })()
+          (()=>{ const b=h(`<button class="btn">Re-run with a new scenario</button>`); b.onclick=()=>{ closeModal(); S.scenario=null; S.answers=[]; S.cursor=0; S.signoff={ name:"", position:"", attest:false, signature:"", signedISO:null }; S.notes=""; S.step="setup"; saveSession(); window.render(); }; return b; })(),
+          (()=>{ const b=h(`<button class="btn danger">Start completely fresh</button>`); b.onclick=()=>{ S = newSession(); clearSession(); closeModal(); window.render(); }; return b; })()
         ] });
     };
     $("#notes").oninput = e => { S.notes = e.target.value; saveSession(); };

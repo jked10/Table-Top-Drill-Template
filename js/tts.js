@@ -60,28 +60,36 @@ const TTS = (() => {
   }
 
   // Speak an array of segments in order; resolves when done.
+  let speaking = false;
+  let runToken = 0;   // bumped on every cancel; in-flight queues check it and abort
+
   function speak(segments) {
     if (!synth) return Promise.resolve();
-    cancel();
+    cancel();                       // stop anything in flight (this bumps runToken)
     if (!enabled) return Promise.resolve();
+    const myToken = runToken;       // claim this run
     const parts = (Array.isArray(segments) ? segments : [segments]).filter(Boolean);
-    notify("speaking");
+    if (!parts.length) return Promise.resolve();
+    speaking = true; notify("speaking");
     return new Promise(resolve => {
       let i = 0;
       const next = () => {
-        if (i >= parts.length) { notify("idle"); resolve(); return; }
+        // If a newer cancel()/speak() happened, this queue is stale — stop dead.
+        if (myToken !== runToken) { resolve(); return; }
+        if (i >= parts.length) { speaking = false; notify("idle"); resolve(); return; }
         const u = new SpeechSynthesisUtterance(strip(parts[i]));
         if (preferredVoice) u.voice = preferredVoice;
         u.rate = rate; u.pitch = 1.0; u.volume = 1.0;
-        u.onend = () => { i++; next(); };
-        u.onerror = () => { i++; next(); };
+        u.onend = () => { if (myToken !== runToken) return; i++; next(); };
+        u.onerror = () => { if (myToken !== runToken) return; i++; next(); };
         synth.speak(u);
       };
       next();
     });
   }
 
-  function cancel() { if (synth) { synth.cancel(); } notify("idle"); }
+  function cancel() { runToken++; speaking = false; if (synth) { try { synth.cancel(); } catch(e){} } notify("idle"); }
+  function isSpeaking() { return speaking; }
   function isEnabled() { return enabled; }
   function setEnabled(v) {
     enabled = v; localStorage.setItem("tdf_tts_on", JSON.stringify(v));
@@ -96,5 +104,5 @@ const TTS = (() => {
   function currentVoice() { return preferredVoice; }
   function supported() { return !!synth; }
 
-  return { speak, cancel, isEnabled, setEnabled, setRate, getRate, getVoices, setVoice, currentVoice, supported, onState, isAutoRead, setAutoRead };
+  return { speak, cancel, isEnabled, setEnabled, setRate, getRate, getVoices, setVoice, currentVoice, supported, onState, isAutoRead, setAutoRead, isSpeaking };
 })();
