@@ -19,6 +19,51 @@ function todayISO() { return new Date().toISOString().slice(0, 10); }
 function fmtDate(iso) { try { return new Date(iso + (iso.length === 10 ? "T00:00:00" : "")).toLocaleDateString(undefined, { weekday:"short", year:"numeric", month:"short", day:"numeric" }); } catch(e){ return iso; } }
 function fmtDateTime(iso) { try { return new Date(iso).toLocaleString(undefined, { dateStyle:"medium", timeStyle:"short" }); } catch(e){ return iso; } }
 
+/* ---- plan/procedure upload: extract text from PDF / Word / text files ---- */
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if ([...document.scripts].some(s => s.src === src)) return resolve();
+    const s = document.createElement("script");
+    s.src = src; s.onload = () => resolve(); s.onerror = () => reject(new Error("load failed: " + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function extractTextFromFile(file) {
+  const name = (file.name || "").toLowerCase();
+  const ext = name.slice(name.lastIndexOf(".") + 1);
+
+  if (ext === "txt" || ext === "md" || ext === "csv" || file.type.startsWith("text/")) {
+    return (await file.text()).trim();
+  }
+
+  if (ext === "pdf" || file.type === "application/pdf") {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+    const lib = window.pdfjsLib;
+    lib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const data = new Uint8Array(await file.arrayBuffer());
+    const pdf = await lib.getDocument({ data }).promise;
+    let out = "";
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      out += content.items.map(i => i.str).join(" ").replace(/\s+/g, " ").trim() + "\n\n";
+    }
+    return out.trim();
+  }
+
+  if (ext === "docx" || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js");
+    const result = await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    return (result.value || "").trim();
+  }
+
+  if (ext === "doc") { throw new Error("Old .doc format not supported — save as .docx or PDF, or paste the text."); }
+
+  // last resort: try reading as text
+  return (await file.text()).trim();
+}
+
 const ICON = {
   shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/></svg>',
   play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l11-7z"/></svg>',
@@ -73,6 +118,7 @@ function newSession() {
     scenarioMode: "random",
     pickId: null,
     injectCount: 10,
+    difficulty: "standard",   // 'easy' | 'standard' | 'hard'
     capturePerPerson: false,
     sessionMode: "local",   // 'local' (facilitator screen) | 'live' (multi-device)
     mode: "host",            // 'host' | 'participant'
@@ -102,6 +148,24 @@ function buildVars() {
 }
 function fill(text, vars) { return String(text || "").replace(/\{(\w+)\}/g, (m, k) => vars[k] ?? m); }
 
+// Randomise option order per inject so the correct answer isn't always "A".
+// Remaps `correct` and `partial` indices to the shuffled positions.
+function shuffleScenarioOptions(scn) {
+  if (!scn || !Array.isArray(scn.injects)) return scn;
+  scn.injects.forEach(inj => {
+    if (!Array.isArray(inj.options) || inj.options.length < 2) return;
+    const order = inj.options.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    inj.options = order.map(i => inj.options[i]);
+    inj.correct = order.indexOf(inj.correct);
+    inj.partial = Array.isArray(inj.partial) ? inj.partial.map(p => order.indexOf(p)).filter(x => x >= 0) : [];
+  });
+  return scn;
+}
+
 function resolveScenario() {
   let base;
   if (S.scenarioMode === "pick" && S.pickId) base = SCENARIOS.find(s => s.id === S.pickId);
@@ -110,6 +174,7 @@ function resolveScenario() {
   S.vars = buildVars();
   // trim / pad injects to requested count
   scn.injects = scn.injects.slice(0, S.injectCount);
+  shuffleScenarioOptions(scn);
   S.scenario = scn;
   S.level = scn.startLevel || 1;
   S.cursor = 0;
@@ -342,6 +407,14 @@ function renderScenarioChoice() {
       </div>
     </div>
     <div id="pickWrap" style="margin-top:16px"></div>
+    <div class="field" style="margin-top:16px">
+      <span class="lab">Difficulty</span>
+      <div id="diffChoice" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        ${[["easy","Easy","Best answer is obvious"],["standard","Standard","Plausible distractors"],["hard","Hard","Subtle, much less obvious answers"]].map(([id,t,d])=>`
+          <button class="btn diff-card" data-diff="${id}" style="flex:1;min-width:160px;flex-direction:column;align-items:flex-start;text-align:left;height:auto;padding:12px 14px;gap:2px"><strong style="font-size:14px">${t}</strong><span class="muted small" style="font-weight:400">${d}</span></button>`).join("")}
+      </div>
+      <span class="hint">Shapes AI-generated scenarios — on Hard the wrong answers are written to be much less obvious, so the team must really know the plan.</span>
+    </div>
     <div class="grid-2" style="margin-top:16px;align-items:start">
       <label class="field"><span class="lab">Number of injects (decision points)</span>
         <input type="number" id="f-count" min="4" max="12" value="${S.injectCount}">
@@ -372,6 +445,15 @@ function renderScenarioChoice() {
   $("#f-count").oninput = e => { S.injectCount = Math.max(4, Math.min(12, parseInt(e.target.value)||10)); saveSession(); };
   $("#f-ppp").onchange = e => { S.capturePerPerson = e.target.checked; saveSession(); };
 
+  const diffCards = $$("#diffChoice .diff-card", box);
+  const refreshDiff = () => diffCards.forEach(c => {
+    const on = c.dataset.diff === (S.difficulty || "standard");
+    c.style.borderColor = on ? "var(--primary)" : "var(--line)";
+    c.style.background = on ? "var(--primary-soft)" : "var(--surface)";
+  });
+  diffCards.forEach(c => c.onclick = () => { S.difficulty = c.dataset.diff; saveSession(); refreshDiff(); });
+  refreshDiff();
+
   function renderPickList() {
     const w = $("#pickWrap"); if (!w) return;
     if (S.scenarioMode !== "pick") { w.innerHTML = ""; return; }
@@ -395,7 +477,8 @@ async function goToBrief() {
     const btn = $("#toBrief"); const old = btn.innerHTML;
     btn.disabled = true; btn.innerHTML = `Generating scenario\u2026`;
     try {
-      const scn = await AI.generate(CFG, PROCEDURE_TEXT, { count: S.injectCount });
+      const scn = await AI.generate(CFG, CFG.facility.planText || PROCEDURE_TEXT, { count: S.injectCount, difficulty: S.difficulty });
+      shuffleScenarioOptions(scn);
       S.vars = buildVars();
       S.scenario = scn; S.level = scn.startLevel || 1; S.cursor = 0;
       S.answers = scn.injects.map(() => ({ given: null, revealed: false, individual: {} }));
@@ -532,14 +615,29 @@ function openSettings() {
         <label class="field"><span class="lab">PFSO name</span><input type="text" id="s-pfso" value="${esc(CFG.pfso.name)}"></label>
         <label class="field"><span class="lab">PFSO position</span><input type="text" id="s-pfsopos" value="${esc(CFG.pfso.position)}"></label>
       </div>
+      <label class="field" style="margin-top:12px"><span class="lab">Facility type</span>
+        <input type="text" id="s-ftype" value="${esc(CFG.facility.type||'')}" placeholder="e.g. marine bulk LPG terminal with a remote sea berth">
+        <span class="hint">Describe what kind of facility this is, in plain words, so AI-generated scenarios match it instead of assuming a generic oil terminal.</span>
+      </label>
+      <div class="field" style="margin-top:12px">
+        <span class="lab">Your security plan / procedure (for AI grounding)</span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 8px">
+          <input type="file" id="s-planfile" accept=".pdf,.docx,.txt,.md,.csv,application/pdf" style="flex:1;min-width:220px">
+          <span class="muted small" id="s-planstate">${CFG.facility.planText ? `${(CFG.facility.planText.length/1000).toFixed(1)}k characters loaded` : "No plan loaded"}</span>
+        </div>
+        <textarea id="s-plantext" rows="6" placeholder="Upload a PDF or Word (.docx) document above and its text appears here — or paste/edit the plan text directly. The AI grounds every model answer and plan reference in this text.">${esc(CFG.facility.planText||'')}</textarea>
+        <span class="hint">Files are read in your browser only — nothing is uploaded to a server. PDFs and Word docs are converted to text automatically; you can trim the result before saving.</span>
+      </div>
     </div>
     <div>
       <div class="eyebrow">Voiceover</div>
       <div style="margin-top:10px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
         <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600"><input type="checkbox" id="s-tts" ${TTS.isEnabled()?"checked":""} style="width:auto"> Enable AI voiceover</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600"><input type="checkbox" id="s-auto" ${TTS.isAutoRead()?"checked":""} style="width:auto"> Auto-read narration &amp; model answers</label>
         <label class="field" style="flex:1;min-width:220px"><span class="lab">Voice</span><select id="s-voice"></select></label>
         <label class="field" style="width:160px"><span class="lab">Speed ${TTS.getRate().toFixed(2)}\u00d7</span><input type="range" id="s-rate" min="0.7" max="1.3" step="0.02" value="${TTS.getRate()}"></label>
       </div>
+      <p class="hint" style="margin-top:6px">Turn <strong>auto-read</strong> off to keep the voiceover silent by default — the facilitator reads each inject aloud, and can still tap the mic / “Read model answer aloud” to play it on demand.</p>
       ${TTS.supported()?"":`<p class="hint" style="color:var(--bad)">This browser does not support speech synthesis.</p>`}
     </div>
     <div>
@@ -577,15 +675,34 @@ function openSettings() {
     const r = new FileReader(); r.onload = () => { CFG.org.logoDataUrl = r.result; toast("Logo loaded \u2014 save to keep"); }; r.readAsDataURL(file);
   };
 
+  $("#s-planfile").onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const st = $("#s-planstate");
+    st.textContent = `Reading ${file.name}\u2026`;
+    try {
+      const text = await extractTextFromFile(file);
+      if (!text) throw new Error("empty");
+      $("#s-plantext").value = text;
+      st.textContent = `${(text.length/1000).toFixed(1)}k characters from ${file.name}`;
+      toast("Plan loaded \u2014 review the text, then Save settings");
+    } catch (err) {
+      st.textContent = err.message && err.message.includes(".doc") ? err.message : "Couldn't read that file";
+      toast(err.message && err.message.includes(".doc") ? err.message : "Couldn't read that file \u2014 try a PDF/.docx or paste the text");
+    }
+  };
+
   function saveSettings() {
     CFG.org.name = $("#s-org").value;
     CFG.facility.name = $("#s-fac").value;
     CFG.facility.location = $("#s-loc").value;
     CFG.facility.planTitle = $("#s-plan").value;
     CFG.facility.planRef = $("#s-ref").value;
+    CFG.facility.type = $("#s-ftype").value;
+    CFG.facility.planText = $("#s-plantext").value;
     CFG.pfso.name = $("#s-pfso").value;
     CFG.pfso.position = $("#s-pfsopos").value;
     TTS.setEnabled($("#s-tts").checked);
+    TTS.setAutoRead($("#s-auto").checked);
     if (vsel.value && !vsel.value.includes("Loading")) TTS.setVoice(vsel.value);
     AI.setKey($("#s-key").value);
     // Firebase config — accept raw JSON or a `const firebaseConfig = {...}` snippet

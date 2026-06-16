@@ -113,8 +113,8 @@ const DrillScreen = (() => {
 
     TTS.onState(state => { const ind=$("#speakInd"); if(ind) ind.style.display = state==="speaking"?"inline-flex":"none"; });
 
-    // Auto-play narration on first visit to this inject
-    if (!ans.revealed && ans.given === null && !ans._visited) { ans._visited = true; saveSession(); setTimeout(()=>speakInject(inject), 250); }
+    // Auto-play narration on first visit to this inject (only if auto-read is on)
+    if (TTS.isAutoRead() && !ans.revealed && ans.given === null && !ans._visited) { ans._visited = true; saveSession(); setTimeout(()=>speakInject(inject), 250); }
 
     function renderOptions() {
       const box = $("#opts");
@@ -193,8 +193,11 @@ const DrillScreen = (() => {
           <p><strong>Model answer:</strong> ${esc(fill(inject.options[inject.correct], S.vars))}</p>
           <p style="margin-top:8px">${esc(fill(inject.rationale, S.vars))}</p>
           <div class="ref">${ICON.doc.replace('width="1.8"','')} Reference: ${esc(inject.ref)}</div>
+          <div style="margin-top:12px"><button class="btn sm" id="playAnswer">${ICON.mic} Read model answer aloud</button></div>
         </div>`;
-      if (TTS.isEnabled() && !ans._spoke) { ans._spoke = true; saveSession();
+      const pa = $("#playAnswer");
+      if (pa) pa.onclick = () => TTS.speak([`The model answer is option ${String.fromCharCode(65+inject.correct)}.`, fill(inject.rationale, S.vars)]);
+      if (TTS.isEnabled() && TTS.isAutoRead() && !ans._spoke) { ans._spoke = true; saveSession();
         TTS.speak([`The model answer is option ${String.fromCharCode(65+inject.correct)}.`, fill(inject.rationale, S.vars)]); }
     }
 
@@ -220,9 +223,16 @@ const DrillScreen = (() => {
 
     function goNext() {
       TTS.cancel();
+      const isLast = S.cursor >= scn.injects.length - 1;
+      if (isLast) {
+        // The final "Finish & score" button must always do something.
+        // If the last inject wasn't revealed yet, confirm (it counts as
+        // unanswered) instead of silently blocking.
+        if (!ans.revealed) { confirmEnd(); return; }
+        finish(); return;
+      }
       if (!ans.revealed) { toast("Reveal the model answer before moving on"); return; }
-      if (S.cursor < scn.injects.length - 1) { S.cursor++; saveSession(); if (liveHost) LiveScreens.hostBroadcast({ cursor: S.cursor, revealed: false }); render(); }
-      else { finish(); }
+      S.cursor++; saveSession(); if (liveHost) LiveScreens.hostBroadcast({ cursor: S.cursor, revealed: false }); render();
     }
 
     function confirmEnd() {
@@ -232,10 +242,10 @@ const DrillScreen = (() => {
           (()=>{ const b=h(`<button class="btn primary">End &amp; score</button>`); b.onclick=()=>{ closeModal(); finish(); }; return b; })() ] });
     }
 
-    function finish() { TTS.cancel(); if (liveHost) { LiveScreens.hostBroadcast({ finished: true }); LiveScreens.hostDetach(); } S.step = "results"; saveSession(); render(); }
+    function finish() { TTS.cancel(); if (liveHost) { LiveScreens.hostBroadcast({ finished: true }); LiveScreens.hostDetach(); } S.step = "results"; saveSession(); window.render(); }
   }
 
-  function render2setup(){ S.step="setup"; saveSession(); render(); }
+  function render2setup(){ S.step="setup"; saveSession(); window.render(); }
 
   return { render, scoreOf };
 })();

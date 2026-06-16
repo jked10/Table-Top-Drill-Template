@@ -18,15 +18,29 @@ const AI = (() => {
 
   function buildPrompt(cfg, procedureText, opts) {
     const roleList = cfg.roles.map(r => `${r.id} = ${r.name} (${r.desc})`).join("\n");
-    return `You are an ISPS Code tabletop-exercise designer. Using ONLY the facility's security plan below, invent ONE fresh, elaborate, realistic tabletop drill scenario for a marine fuel terminal.
+    const diff = opts.difficulty || "standard";
+    const diffGuide = {
+      easy:     "DIFFICULTY = EASY. The best option should be clearly correct and the three wrong options recognisably poor. Give exactly 4 options.",
+      standard: "DIFFICULTY = STANDARD. Make the wrong options genuinely plausible so the responsible role must actually know the plan to choose well. Give exactly 4 options.",
+      hard:     "DIFFICULTY = HARD. Make ALL options sound defensible; the distinction between them must be subtle (timing, correct sequence, who has authority, who to notify first, what to do before what). Avoid any obviously-wrong or absurd option. Give exactly 5 options."
+    }[diff] || "DIFFICULTY = STANDARD. Make the wrong options plausible. Give exactly 4 options.";
+    const facilityType = cfg.facility.type || "port facility";
+    const planExtract = (procedureText || "").trim();
+    const planBlock = planExtract
+      ? `PLAN EXTRACT (ground every model answer in THIS text and cite its sections in "ref"):\n"""${planExtract.slice(0, 9000)}"""`
+      : `No plan text was provided. Base model answers on standard ISPS Code PFSP good practice appropriate to the facility type above, and keep "ref" generic (e.g. "PFSP — communications").`;
 
-FACILITY: ${cfg.facility.name}, ${cfg.facility.location}. Plan: ${cfg.facility.planTitle}.
+    return `You are an ISPS Code tabletop-exercise designer. Invent ONE fresh, elaborate, realistic tabletop drill scenario tailored to the SPECIFIC facility described below. Do NOT assume a generic oil/fuel terminal — honour the facility type and plan exactly (e.g. cargo handled, where the ship–shore interface is, when security measures apply).
+
+FACILITY TYPE: ${facilityType}
+FACILITY: ${cfg.facility.name}, ${cfg.facility.location}. Standard: ${cfg.facility.standard}. Plan: ${cfg.facility.planTitle}.
 
 AVAILABLE ROLES (use these exact ids for "role"):
 ${roleList}
 
-PLAN EXTRACT (ground every model answer in this):
-"""${(procedureText || "").slice(0, 6000)}"""
+${planBlock}
+
+${diffGuide}
 
 Produce a JSON object ONLY (no prose, no markdown fences) with this exact shape:
 {
@@ -34,14 +48,14 @@ Produce a JSON object ONLY (no prose, no markdown fences) with this exact shape:
  "category": "threat category",
  "startLevel": 1,
  "synopsis": "1-2 sentence overview",
- "setup": "2-3 sentence situation brief, present tense",
+ "setup": "2-3 sentence situation brief, present tense, specific to this facility",
  "injects": [
    {
      "phase": "Detection|Notification|Assessment|Response|Escalation|Recovery",
      "role": "<one role id from the list>",
      "scene": "2-3 sentences of escalating narration",
      "q": "the decision question for the responsible role",
-     "options": ["correct best-practice option","plausible wrong option","plausible wrong option","plausible wrong option"],
+     "options": ["the single best option", "wrong/weaker option", "wrong/weaker option", "wrong/weaker option"],
      "correct": 0,
      "rationale": "why, citing what the plan requires",
      "ref": "plan section reference",
@@ -49,7 +63,7 @@ Produce a JSON object ONLY (no prose, no markdown fences) with this exact shape:
    }
  ]
 }
-Rules: exactly ${opts.count} injects, progressing through the phases in order; vary the responsible role across injects; the correct option must reflect the plan; keep options concise; shuffle which index is correct across injects. Return ONLY the JSON object.`;
+Rules: exactly ${opts.count} injects, progressing through the phases in order; vary the responsible role across injects; the correct option must reflect the plan/profile. ALWAYS put the single best option FIRST with "correct": 0 (the app reshuffles option order itself). Keep options concise. Return ONLY the JSON object.`;
   }
 
   async function callBuiltIn(prompt) {
@@ -96,7 +110,7 @@ Rules: exactly ${opts.count} injects, progressing through the phases in order; v
       phase: inj.phase || "Response",
       role: ids.has(inj.role) ? inj.role : cfg.roles[0].id,
       scene: inj.scene, q: inj.q,
-      options: inj.options.slice(0, 4),
+      options: inj.options.slice(0, 6),
       correct: Math.max(0, Math.min(inj.correct, inj.options.length - 1)),
       partial: [],
       rationale: inj.rationale || "",
@@ -110,7 +124,7 @@ Rules: exactly ${opts.count} injects, progressing through the phases in order; v
   }
 
   async function generate(cfg, procedureText, opts = {}) {
-    const prompt = buildPrompt(cfg, procedureText, { count: opts.count || 10 });
+    const prompt = buildPrompt(cfg, procedureText, { count: opts.count || 10, difficulty: opts.difficulty });
     let text;
     if (hasBuiltIn()) text = await callBuiltIn(prompt);
     else if (userKey()) text = await callAnthropic(prompt);

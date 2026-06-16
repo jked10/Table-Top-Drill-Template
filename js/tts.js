@@ -10,6 +10,7 @@ const TTS = (() => {
   let voices = [];
   let preferredVoice = null;
   let enabled = JSON.parse(localStorage.getItem("tdf_tts_on") ?? "true");
+  let autoRead = JSON.parse(localStorage.getItem("tdf_tts_auto") ?? "true");
   let rate = parseFloat(localStorage.getItem("tdf_tts_rate") || "0.98");
   let listeners = [];
 
@@ -87,11 +88,13 @@ const TTS = (() => {
     if (!v) cancel();
   }
   function setRate(r) { rate = r; localStorage.setItem("tdf_tts_rate", String(r)); }
+  function isAutoRead() { return autoRead; }
+  function setAutoRead(v) { autoRead = v; localStorage.setItem("tdf_tts_auto", JSON.stringify(v)); if (!v) cancel(); }
   function getRate() { return rate; }
   function getVoices() { if (synth && !voices.length) pickVoice(); return voices; }
   function setVoice(uri) { localStorage.setItem("tdf_tts_voice", uri); pickVoice(); }
   function currentVoice() { return preferredVoice; }
   function supported() { return !!synth; }
 
-  return { speak, cancel, isEnabled, setEnabled, setRate, getRate, getVoices, setVoice, currentVoice, supported, onState };
+  return { speak, cancel, isEnabled, setEnabled, setRate, getRate, getVoices, setVoice, currentVoice, supported, onState, isAutoRead, setAutoRead };
 })();

@@ -22,10 +22,13 @@
      };
    ------------------------------------------------------------ */
 const CONFIG_FIREBASE = {
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",
-  projectId: ""
+  apiKey: "AIzaSyBTObwN8z6miSLdTbWQdREU0PrexT49G5k",
+  authDomain: "table-top-drill-template.firebaseapp.com",
+  databaseURL: "https://table-top-drill-template-default-rtdb.firebaseio.com",
+  projectId: "table-top-drill-template",
+  storageBucket: "table-top-drill-template.firebasestorage.app",
+  messagingSenderId: "391743242014",
+  appId: "1:391743242014:web:dd5e49779552eb3732530f"
 };
 
 const DEFAULT_CONFIG = {
@@ -38,7 +41,9 @@ const DEFAULT_CONFIG = {
     location: "St. Michael, Barbados",
     planTitle: "Port Facility Security Plan (PFSP)",
     planRef: "Manual No. SP 01",
-    standard: "ISPS Code · SOLAS Ch. XI-2"
+    standard: "ISPS Code · SOLAS Ch. XI-2",
+    type: "marine bulk LPG terminal — shore storage tanks linked by pipeline to a remote sea berth; ISPS security measures apply while a gas carrier is alongside discharging",
+    planText: ""   // paste your full plan text via Settings to ground AI-generated scenarios
   },
   pfso: {
     name: "Junair DeSouza",

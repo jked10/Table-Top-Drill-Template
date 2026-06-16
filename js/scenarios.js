@@ -9,8 +9,8 @@
    ============================================================ */
 
 const RANDOM_POOL = {
-  vessel: ["MT Caribbean Trader","MT Atlantic Pioneer","MT Bridgetown Star","MT Sargasso","MT Windward Spirit","MT Petrel","MT Coral Galaxy","MT Speightstown"],
-  cargo:  ["unleaded gasoline","gasoil","automotive diesel","jet A-1 aviation fuel","fuel oil"],
+  vessel: ["LPG/C Caribbean Gas","LPG/C Atlantic Pioneer","LPG/C Bridgetown Star","LPG/C Sargasso","LPG/C Windward Spirit","LPG/C Petrel","LPG/C Coral Galaxy","LPG/C Speightstown"],
+  cargo:  ["commercial propane","commercial butane","an LPG propane/butane mix","refrigerated propane","pressurised butane"],
   flag:   ["Panama","Liberia","Marshall Islands","Singapore","Malta"],
   time:   ["02:40","23:15","19:50","05:30","21:05","14:20"],
   wind:   ["a light easterly breeze","a fresh 18-knot trade wind","near-calm conditions","gusty 25-knot squalls","a moderate onshore swell"],
