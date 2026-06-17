@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DrillFrame — Explainer</title>
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary: #3b5bbf; --primary-deep:#2e47a0; --primary-soft:#eaeefa;
+    --ink:#363b47; --sans:"Public Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",monospace;
+    --ok:#3d9a6b;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; background:#0c1326; }
+  body{ display:grid; place-items:center; font-family:var(--sans); overflow:hidden; }
+  #frame{ position:relative; }
+  .stage{
+    width:1280px; height:720px; position:relative; overflow:hidden;
+    background:radial-gradient(120% 130% at 80% -10%, #24407f 0%, #16213f 45%, #0c1326 100%);
+    transform-origin:top left; color:#fff;
+  }
+  /* scene base */
+  .scene{ position:absolute; inset:0; opacity:0; pointer-events:none; }
+  .scene.show{ opacity:1; }
+  .pad{ position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; padding:0 110px; }
+
+  /* kinetic helpers */
+  .rise{ opacity:0; transform:translateY(26px); transition:opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+  .scene.show .rise{ opacity:1; transform:none; }
+  .d1{ transition-delay:.05s } .d2{ transition-delay:.2s } .d3{ transition-delay:.35s } .d4{ transition-delay:.5s }
+
+  .eyebrow{ font-family:var(--mono); font-size:18px; letter-spacing:.32em; text-transform:uppercase; color:#9db4ee; font-weight:600; }
+  h1{ font-size:74px; line-height:1.04; letter-spacing:-.03em; font-weight:800; }
+  h1 .accent{ color:#9db4ee; }
+  .sub{ font-size:27px; color:#c4cfe8; margin-top:22px; max-width:20em; font-weight:500; }
+
+  /* scene 1 grid backdrop */
+  .gridbg{ position:absolute; inset:0; background-image:linear-gradient(#ffffff10 1px,transparent 1px),linear-gradient(90deg,#ffffff10 1px,transparent 1px); background-size:64px 64px; mask-image:radial-gradient(80% 80% at 50% 40%, #000 30%, transparent 75%); }
+
+  /* doc → cards (scene 2) */
+  .flowwrap{ position:absolute; right:96px; top:50%; transform:translateY(-50%); width:520px; height:520px; }
+  .doc{ position:absolute; left:40px; top:90px; width:230px; height:300px; background:#fff; border-radius:14px; box-shadow:0 24px 60px #0008; padding:24px 22px; transform:rotate(-4deg) scale(.6); opacity:0; transition:all .8s cubic-bezier(.2,.7,.2,1); }
+  .scene.show .doc{ opacity:1; transform:rotate(-4deg) scale(1); }
+  .doc .ln{ height:9px; border-radius:5px; background:#dfe4ee; margin-bottom:11px; }
+  .doc .ln.t{ background:var(--primary); width:55%; height:13px; margin-bottom:18px; }
+  .card3{ position:absolute; border-radius:13px; background:linear-gradient(160deg,#fff,#eef2fb); color:var(--ink); box-shadow:0 18px 44px #0007; padding:16px 17px; width:250px; opacity:0; transform:translateX(40px) scale(.9); transition:all .7s cubic-bezier(.2,.7,.2,1); }
+  .scene.show .card3{ opacity:1; transform:none; }
+  .card3 .tag{ font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--primary); font-weight:600; }
+  .card3 .qt{ font-weight:700; font-size:16px; margin-top:6px; line-height:1.25; }
+  #c3a{ right:0; top:70px; transition-delay:.25s } #c3b{ right:34px; top:200px; transition-delay:.45s } #c3c{ right:8px; top:330px; transition-delay:.65s }
+
+  /* scene 3 — run & score */
+  .phones{ position:absolute; left:110px; top:50%; transform:translateY(-50%); display:flex; gap:26px; }
+  .phone{ width:150px; height:310px; border-radius:26px; background:#0e1730; border:3px solid #33457c; box-shadow:0 20px 50px #0009; padding:16px 13px; opacity:0; transform:translateY(40px); transition:all .6s cubic-bezier(.2,.7,.2,1); }
+  .scene.show .phone{ opacity:1; transform:none; }
+  .phone:nth-child(2){ transition-delay:.12s } .phone:nth-child(3){ transition-delay:.24s }
+  .phone .pill{ height:8px; width:44px; border-radius:5px; background:#33457c; margin:0 auto 16px; }
+  .phone .opt{ height:30px; border-radius:8px; background:#18244a; margin-bottom:9px; display:flex; align-items:center; padding:0 10px; gap:8px; }
+  .phone .opt .b{ width:14px; height:14px; border-radius:4px; border:2px solid #44568f; flex:none; }
+  .phone .opt.ok{ background:#143a2b; } .phone .opt.ok .b{ background:var(--ok); border-color:var(--ok); }
+  .phone .opt .l{ height:6px; border-radius:4px; background:#33457c; flex:1; }
+  .ring{ position:absolute; right:150px; top:50%; transform:translateY(-50%); width:300px; height:300px; }
+  .ring svg{ width:100%; height:100%; transform:rotate(-90deg); }
+  .ring .num{ position:absolute; inset:0; display:grid; place-items:center; flex-direction:column; }
+  .ring .num .big{ font-size:84px; font-weight:800; letter-spacing:-.03em; }
+  .ring .num .lbl{ font-family:var(--mono); font-size:14px; letter-spacing:.2em; color:#9db4ee; text-transform:uppercase; }
+
+  /* scene 5 — pick scenario */
+  .picker{ position:absolute; right:90px; top:50%; transform:translateY(-50%); width:450px; }
+  .scn{ background:#fff; color:var(--ink); border-radius:12px; padding:14px 18px; margin-bottom:12px; display:flex; align-items:center; gap:14px; box-shadow:0 14px 34px #0006; opacity:0; transform:translateX(40px); transition:all .6s cubic-bezier(.2,.7,.2,1); }
+  .scene.show .scn{ opacity:1; transform:none; }
+  .scn:nth-child(1){ transition-delay:.18s } .scn:nth-child(2){ transition-delay:.32s } .scn:nth-child(3){ transition-delay:.46s } .scn:nth-child(4){ transition-delay:.6s }
+  .scn.sel{ box-shadow:0 0 0 3px #9db4ee, 0 14px 34px #0006; }
+  .scn .ico{ width:38px; height:38px; border-radius:10px; background:var(--primary-soft); display:grid; place-items:center; flex:none; color:var(--primary-deep); }
+  .scn .ico svg{ width:21px; height:21px; }
+  .scn .nm{ font-weight:700; font-size:16px; }
+  .scn .chk{ margin-left:auto; width:25px; height:25px; border-radius:50%; background:var(--ok); display:grid; place-items:center; }
+  .scn .chk svg{ width:14px; height:14px; }
+  .diff{ display:flex; gap:10px; margin-top:26px; opacity:0; transform:translateY(14px); transition:all .55s cubic-bezier(.2,.7,.2,1) .7s; }
+  .scene.show .diff{ opacity:1; transform:none; }
+  .dchip{ font-family:var(--mono); font-size:13px; letter-spacing:.1em; text-transform:uppercase; padding:10px 16px; border-radius:9px; background:#ffffff14; border:1px solid #ffffff2e; color:#c4cfe8; }
+  .dchip.on{ background:#c0473c; border-color:#c0473c; color:#fff; }
+
+  /* scene 6 — report */
+  .report{ position:absolute; left:50%; top:57%; transform:translate(-50%,-42%); width:620px; background:#fff; color:var(--ink); border-radius:18px; box-shadow:0 30px 80px #0009; padding:26px 30px; opacity:0; transition:opacity .6s, transform .6s; }
+  .scene.show .report{ opacity:1; transform:translate(-50%,-50%); }
+  .report .rhead{ display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e4e7ed; padding-bottom:15px; margin-bottom:14px; }
+  .report .rtitle{ font-size:20px; font-weight:800; letter-spacing:-.02em; }
+  .report .rscore{ font-family:var(--mono); font-size:14px; color:var(--ok); font-weight:600; }
+  .rrow{ display:flex; align-items:center; gap:16px; padding:9px 0; }
+  .rrow .who{ font-weight:700; font-size:15px; width:130px; }
+  .rrow .role{ font-size:13px; color:#878c99; flex:1; }
+  .rbar{ width:130px; height:9px; border-radius:5px; background:#eef2fb; overflow:hidden; }
+  .rbar i{ display:block; height:100%; background:var(--ok); border-radius:5px; }
+  .rrow .pct{ font-family:var(--mono); font-size:14px; font-weight:600; width:38px; text-align:right; }
+  .sign{ margin-top:14px; padding-top:14px; border-top:1px dashed #cfd6e2; display:flex; align-items:center; gap:14px; color:#878c99; font-size:13.5px; }
+  .sign .sig{ font-style:italic; font-size:23px; color:var(--primary-deep); border-bottom:2px solid #cfd6e2; padding:0 24px 2px; }
+
+  /* scene 4 logo */
+  .logolock{ display:flex; flex-direction:column; align-items:center; gap:26px; text-align:center; }
+  .lm{ width:120px; height:120px; border-radius:30px; background:var(--primary); display:grid; place-items:center; box-shadow:0 22px 60px #3b5bbf66; }
+  .lm svg{ width:72px; height:72px; }
+  .wm{ font-size:64px; font-weight:800; letter-spacing:-.03em; }
+  .tag4{ font-size:26px; color:#c4cfe8; font-weight:500; }
+
+  /* progress bar */
+  .prog{ position:absolute; left:0; bottom:0; height:4px; background:#9db4ee; width:0%; }
+
+  /* play overlay */
+  #overlay{ position:absolute; inset:0; background:rgba(8,14,30,.72); backdrop-filter:blur(3px); display:grid; place-items:center; cursor:pointer; z-index:5; transition:opacity .4s; }
+  #overlay.hide{ opacity:0; pointer-events:none; visibility:hidden; }
+  .playbtn{ display:flex; flex-direction:column; align-items:center; gap:20px; }
+  .playbtn .circ{ width:104px; height:104px; border-radius:50%; background:var(--primary); display:grid; place-items:center; box-shadow:0 18px 50px #3b5bbf88; transition:transform .2s; }
+  #overlay:hover .circ{ transform:scale(1.06); }
+  .playbtn .circ svg{ width:44px; height:44px; margin-left:6px; }
+  .playbtn .t{ font-family:var(--mono); letter-spacing:.18em; text-transform:uppercase; font-size:15px; color:#c4cfe8; }
+  .replay{ position:absolute; right:22px; bottom:20px; z-index:6; background:#ffffff18; border:1px solid #ffffff33; color:#fff; font-family:var(--mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase; padding:9px 14px; border-radius:9px; cursor:pointer; opacity:0; transition:opacity .3s; }
+  .replay.show{ opacity:1; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div class="stage" id="stage">
+
+    <!-- SCENE 1 — problem -->
+    <div class="scene" id="s1">
+      <div class="gridbg"></div>
+      <div class="pad">
+        <div class="eyebrow rise d1">Tabletop drills · any procedure</div>
+        <h1 class="rise d2" style="margin-top:20px">A plan you've never<br>practised is just <span class="accent">paper.</span></h1>
+      </div>
+    </div>
+
+    <!-- SCENE 2 — upload → AI builds -->
+    <div class="scene" id="s2">
+      <div class="pad" style="padding-right:560px">
+        <div class="eyebrow rise d1">Step one</div>
+        <h1 class="rise d2" style="font-size:60px;margin-top:16px">Upload your<br>procedure.</h1>
+        <div class="sub rise d3">DrillFrame reads it and builds a scored scenario — grounded in your own plan.</div>
+      </div>
+      <div class="flowwrap">
+        <div class="doc"><div class="ln t"></div><div class="ln"></div><div class="ln" style="width:90%"></div><div class="ln" style="width:80%"></div><div class="ln" style="width:88%"></div><div class="ln" style="width:60%"></div></div>
+        <div class="card3" id="c3a"><div class="tag">Inject 01 · Fire</div><div class="qt">Who orders the evacuation?</div></div>
+        <div class="card3" id="c3b"><div class="tag">Inject 02 · Muster</div><div class="qt">Where does the team assemble?</div></div>
+        <div class="card3" id="c3c"><div class="tag">Inject 03 · Comms</div><div class="qt">Who calls emergency services?</div></div>
+      </div>
+    </div>
+
+    <!-- SCENE 3 — run & score -->
+    <div class="scene" id="s3">
+      <div class="phones">
+        <div class="phone"><div class="pill"></div><div class="opt ok"><span class="b"></span><span class="l"></span></div><div class="opt"><span class="b"></span><span class="l"></span></div><div class="opt"><span class="b"></span><span class="l"></span></div></div>
+        <div class="phone"><div class="pill"></div><div class="opt"><span class="b"></span><span class="l"></span></div><div class="opt ok"><span class="b"></span><span class="l"></span></div><div class="opt"><span class="b"></span><span class="l"></span></div></div>
+        <div class="phone"><div class="pill"></div><div class="opt"><span class="b"></span><span class="l"></span></div><div class="opt"><span class="b"></span><span class="l"></span></div><div class="opt ok"><span class="b"></span><span class="l"></span></div></div>
+      </div>
+      <div class="pad" style="padding-left:540px">
+        <div class="eyebrow rise d1">Live or on one screen</div>
+        <h1 class="rise d2" style="font-size:58px;margin-top:14px">Run it.<br>Score every<br>decision.</h1>
+      </div>
+      <div class="ring">
+        <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="#ffffff1c" stroke-width="11"/><circle id="ringArc" cx="60" cy="60" r="52" fill="none" stroke="#3d9a6b" stroke-width="11" stroke-linecap="round" stroke-dasharray="327" stroke-dashoffset="327" style="transition:stroke-dashoffset 1.4s cubic-bezier(.2,.7,.2,1) .3s"/></svg>
+        <div class="num"><div style="text-align:center"><div class="big" id="scoreNum">0</div><div class="lbl">Team score</div></div></div>
+      </div>
+    </div>
+
+    <!-- SCENE 5 — pick scenario -->
+    <div class="scene" id="s5">
+      <div class="pad" style="padding-right:560px">
+        <div class="eyebrow rise d1">Step two</div>
+        <h1 class="rise d2" style="font-size:58px;margin-top:16px">Choose the<br>scenario.</h1>
+        <div class="sub rise d3">DrillFrame offers the emergencies your plan actually covers — at the difficulty you set.</div>
+        <div class="diff"><span class="dchip">Easy</span><span class="dchip">Standard</span><span class="dchip on">Hard</span></div>
+      </div>
+      <div class="picker">
+        <div class="scn sel"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s4 4 4 9a4 4 0 0 1-8 0c0-1 .5-2 .5-2S8 11 8 13a4 4 0 0 0 8 0c0-5-4-11-4-11z"/></svg></span><span class="nm">Fire &amp; evacuation</span><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg></span></div>
+        <div class="scn"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7S6 9 6 14a6 6 0 0 0 12 0c0-5-6-11.3-6-11.3z"/></svg></span><span class="nm">Hazardous spill</span></div>
+        <div class="scn"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z"/></svg></span><span class="nm">Security breach</span></div>
+        <div class="scn"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span><span class="nm">Medical emergency</span></div>
+      </div>
+    </div>
+
+    <!-- SCENE 6 — report & sign-off -->
+    <div class="scene" id="s6">
+      <div style="position:absolute;top:64px;left:0;right:0;text-align:center">
+        <div class="eyebrow rise d1">Sign-off ready</div>
+        <h1 class="rise d2" style="font-size:46px;margin-top:10px">Score. Report. Done.</h1>
+      </div>
+      <div class="report">
+        <div class="rhead"><div class="rtitle">Drill report · Fire &amp; evacuation</div><div class="rscore">TEAM SCORE · 86%</div></div>
+        <div class="rrow"><span class="who">A. Okafor</span><span class="role">Incident Controller</span><span class="rbar"><i style="width:92%"></i></span><span class="pct">92</span></div>
+        <div class="rrow"><span class="who">M. Reyes</span><span class="role">Communications Lead</span><span class="rbar"><i style="width:84%"></i></span><span class="pct">84</span></div>
+        <div class="rrow"><span class="who">L. Haddad</span><span class="role">Muster Warden</span><span class="rbar"><i style="width:80%"></i></span><span class="pct">80</span></div>
+        <div class="sign"><span>Signed off</span><span class="sig">A. Okafor</span><span>16 Jun 2026</span></div>
+      </div>
+    </div>
+
+    <!-- SCENE 4 — logo -->
+    <div class="scene" id="s4">
+      <div class="pad" style="align-items:center">
+        <div class="logolock">
+          <div class="lm rise d1"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+          <div class="wm rise d2">DrillFrame</div>
+          <div class="tag4 rise d3">Rehearse the emergency before it happens.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="prog" id="prog"></div>
+  </div>
+
+  <div id="overlay">
+    <div class="playbtn">
+      <div class="circ"><svg viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>
+      <div class="t">Play · with sound</div>
+    </div>
+  </div>
+  <button class="replay" id="replay">↻ Replay</button>
+  <!-- Real voiceover + background music -->
+  <audio id="vo" preload="auto"></audio>
+  <audio id="music" preload="auto" loop></audio>
+</div>
+
+<script>
+(function(){
+  var stage = document.getElementById("stage");
+  var frame = document.getElementById("frame");
+  var overlay = document.getElementById("overlay");
+  var replay = document.getElementById("replay");
+  var prog = document.getElementById("prog");
+  var W = 1280, H = 720;
+
+  function fit(){
+    var pad = 0;
+    var scale = Math.min((window.innerWidth-pad)/W, (window.innerHeight-pad)/H);
+    stage.style.transform = "scale("+scale+")";
+    frame.style.width = (W*scale)+"px";
+    frame.style.height = (H*scale)+"px";
+  }
+  window.addEventListener("resize", fit); fit();
+
+  // ---- scenes: order + start point as a FRACTION of the voiceover length ----
+  // Fractions are proportional to the script, so captions track the speech even
+  // if the voiceover runs a little shorter or longer than expected.
+  var scenes = [
+    { el:"s1", frac:0.00 },
+    { el:"s2", frac:0.123 },
+    { el:"s5", frac:0.323 },
+    { el:"s3", frac:0.492 },
+    { el:"s6", frac:0.723 },
+    { el:"s4", frac:0.892 }
+  ];
+  var FALLBACK = 30;   // seconds — used only if the voiceover can't load
+
+  var voEl = document.getElementById("vo");
+  var musicEl = document.getElementById("music");
+  voEl.src = "vo.mp3"; voEl.load();
+  musicEl.src = "music.mp3"; musicEl.volume = 0;
+
+  // Preload both tracks fully into memory (blob) so playback never stalls / cuts in-out
+  // the way streamed audio can. Swaps in only while paused, so it won't interrupt playback.
+  function preloadBlob(url, el){
+    fetch(url).then(function(r){ return r.ok ? r.blob() : null; }).then(function(b){
+      if(b && el.paused){ try{ el.src = URL.createObjectURL(b); el.load(); }catch(e){} }
+    }).catch(function(){});
+  }
+  preloadBlob("vo.mp3", voEl);
+  preloadBlob("music.mp3", musicEl);
+
+  var rafId=null, D=null, mode=null, startPerf=0, curIdx=-1, finished=false;
+
+  function showScene(idx){
+    if(idx===curIdx) return;
+    curIdx = idx;
+    document.querySelectorAll(".scene").forEach(function(s){ s.classList.remove("show"); });
+    var sc = scenes[idx]; if(!sc) return;
+    document.getElementById(sc.el).classList.add("show");
+    if(sc.el==="s3"){
+      setTimeout(function(){ document.getElementById("ringArc").style.strokeDashoffset = 46; }, 50);
+      var target=86, t0=null;
+      function count(ts){ if(t0===null){ t0=ts; } var p=Math.min((ts-t0)/1400,1); document.getElementById("scoreNum").textContent = Math.round(p*target); if(p<1) requestAnimationFrame(count); }
+      requestAnimationFrame(count);
+    }
+  }
+
+  function clock(){
+    if(D===null){
+      if(voEl && isFinite(voEl.duration) && voEl.duration > 0){ mode="vo"; D=voEl.duration; }
+      else { mode="timer"; D=FALLBACK; startPerf=performance.now(); }
+    }
+    var t = mode==="vo" ? voEl.currentTime : (performance.now()-startPerf)/1000;
+    var frac = D ? t/D : 0;
+    prog.style.width = Math.min(frac*100,100) + "%";
+    if(musicEl){
+      var fin = Math.min(t/1.0, 1);                    // 1.0s fade in
+      var fout = Math.min(Math.max((D-t)/1.6, 0), 1);  // 1.6s fade out
+      musicEl.volume = 0.42 * fin * fout;              // background bed under the voice
+    }
+    var idx=0; for(var i=0;i<scenes.length;i++){ if(frac>=scenes[i].frac) idx=i; }
+    showScene(idx);
+    if(t < D - 0.05 && !(mode==="vo" && voEl.ended)){ rafId = requestAnimationFrame(clock); }
+    else { finish(); }
+  }
+
+  function finish(){
+    if(finished) return; finished=true;
+    showScene(scenes.length-1);
+    prog.style.width = "100%";
+    replay.classList.add("show");
+    if(musicEl){ try{ musicEl.pause(); }catch(e){} }
+  }
+
+  function reset(){
+    if(rafId) cancelAnimationFrame(rafId);
+    D=null; mode=null; curIdx=-1; finished=false;
+    document.querySelectorAll(".scene").forEach(function(s){ s.classList.remove("show"); });
+    document.getElementById("ringArc").style.strokeDashoffset = 327;
+    document.getElementById("scoreNum").textContent = "0";
+    prog.style.transition="none"; prog.style.width = "0%";
+    try{ voEl.pause(); voEl.currentTime=0; }catch(e){}
+    try{ musicEl.pause(); musicEl.currentTime=0; musicEl.volume=0; }catch(e){}
+  }
+
+  function play(){
+    reset();
+    overlay.classList.add("hide");
+    replay.classList.remove("show");
+    setTimeout(function(){ overlay.style.display = "none"; }, 420);
+    try{ voEl.currentTime=0; var pv=voEl.play(); if(pv&&pv.catch) pv.catch(function(){}); }catch(e){}
+    try{ musicEl.currentTime=0; musicEl.volume=0.42; var pm=musicEl.play(); if(pm&&pm.catch) pm.catch(function(){}); }catch(e){}
+    rafId = requestAnimationFrame(clock);
+  }
+
+  overlay.addEventListener("click", play);
+  replay.addEventListener("click", play);
+})();
+</script>
+</body>
+</html>

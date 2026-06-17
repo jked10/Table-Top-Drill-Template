@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DrillFrame — Tabletop drills for any procedure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-180.png">
+<meta name="theme-color" content="#3b5bbf">
+<style>
+:root{
+  --bg: oklch(0.975 0.006 248);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.985 0.006 248);
+  --ink: oklch(0.27 0.03 255);
+  --ink-soft: oklch(0.45 0.025 255);
+  --muted: oklch(0.58 0.02 255);
+  --line: oklch(0.91 0.012 250);
+  --line-soft: oklch(0.95 0.008 250);
+  --primary: oklch(0.52 0.11 252);
+  --primary-deep: oklch(0.42 0.10 254);
+  --primary-soft: oklch(0.95 0.03 250);
+  --ok: oklch(0.58 0.11 156);
+  --ok-bg: oklch(0.95 0.04 156);
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow-sm: 0 1px 2px oklch(0.4 0.03 255 / 0.06), 0 1px 3px oklch(0.4 0.03 255 / 0.05);
+  --shadow-md: 0 4px 16px oklch(0.4 0.03 255 / 0.08), 0 2px 6px oklch(0.4 0.03 255 / 0.05);
+  --shadow-lg: 0 18px 48px oklch(0.35 0.04 255 / 0.16), 0 6px 16px oklch(0.35 0.04 255 / 0.08);
+  --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --maxw: 1140px;
+  --hero-bg: linear-gradient(180deg, var(--primary-soft), var(--bg) 70%);
+}
+/* ---- accent themes (style switcher) ---- */
+body[data-accent="blue"]{ --primary: oklch(0.52 0.11 252); --primary-deep: oklch(0.42 0.10 254); --primary-soft: oklch(0.95 0.03 250); }
+body[data-accent="teal"]{ --primary: oklch(0.55 0.09 200); --primary-deep: oklch(0.44 0.08 202); --primary-soft: oklch(0.95 0.03 200); }
+body[data-accent="indigo"]{ --primary: oklch(0.48 0.14 276); --primary-deep: oklch(0.39 0.13 278); --primary-soft: oklch(0.95 0.035 280); }
+body[data-accent="slate"]{ --primary: oklch(0.40 0.03 255); --primary-deep: oklch(0.31 0.03 255); --primary-soft: oklch(0.94 0.008 255); }
+/* hero treatments */
+body[data-hero="soft"]{ --hero-bg: linear-gradient(180deg, var(--primary-soft), var(--bg) 70%); }
+body[data-hero="bold"]{ --hero-bg: linear-gradient(155deg, var(--primary-deep), var(--primary) 65%, var(--primary-deep)); }
+body[data-hero="plain"]{ --hero-bg: var(--surface); }
+
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; scroll-behavior:smooth; }
+body{ font-family:var(--sans); background:var(--bg); color:var(--ink); font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased; }
+h1,h2,h3,h4{ margin:0; font-weight:700; letter-spacing:-0.02em; line-height:1.12; }
+p{ margin:0; }
+a{ color:inherit; text-decoration:none; }
+.wrap{ max-width:var(--maxw); margin:0 auto; padding:0 24px; }
+.eyebrow{ font-family:var(--mono); font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--primary); font-weight:600; }
+.btn{ display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:15px; padding:12px 20px; border-radius:10px; border:1.5px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; transition:transform .08s, box-shadow .15s, background .15s; }
+.btn:hover{ transform:translateY(-1px); box-shadow:var(--shadow-sm); }
+.btn.primary{ background:var(--primary); border-color:var(--primary); color:#fff; box-shadow:var(--shadow-sm); }
+.btn.primary:hover{ background:var(--primary-deep); box-shadow:var(--shadow-md); }
+.btn.lg{ padding:15px 26px; font-size:16px; }
+.btn.ghostlight{ background:transparent; border-color:oklch(1 0 0 / .35); color:#fff; }
+
+/* ---- nav ---- */
+nav{ position:sticky; top:0; z-index:50; background:oklch(1 0 0 / .82); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
+.nav-in{ display:flex; align-items:center; gap:18px; height:66px; }
+.brand{ display:flex; align-items:center; gap:11px; font-weight:800; font-size:19px; letter-spacing:-.02em; }
+.mark{ width:34px; height:34px; border-radius:9px; background:var(--primary); display:grid; place-items:center; flex:none; box-shadow:var(--shadow-sm); }
+.mark svg{ width:20px; height:20px; }
+.nav-links{ display:flex; gap:26px; margin-left:14px; }
+.nav-links a{ font-size:14.5px; font-weight:500; color:var(--ink-soft); }
+.nav-links a:hover{ color:var(--ink); }
+.nav-cta{ margin-left:auto; display:flex; gap:10px; align-items:center; }
+@media (max-width:760px){ .nav-links{ display:none; } }
+
+/* ---- hero ---- */
+.hero{ background:var(--hero-bg); border-bottom:1px solid var(--line); }
+.hero-in{ display:grid; grid-template-columns:1.1fr .9fr; gap:48px; align-items:center; padding:74px 0 80px; }
+.hero h1{ font-size:clamp(34px,5vw,56px); letter-spacing:-0.035em; }
+.hero .sub{ font-size:19px; color:var(--ink-soft); margin-top:20px; max-width:30em; }
+.hero .cta-row{ display:flex; gap:13px; margin-top:30px; flex-wrap:wrap; }
+.hero .note{ font-size:13.5px; color:var(--muted); margin-top:16px; }
+body[data-hero="bold"] .hero{ color:#fff; }
+body[data-hero="bold"] .hero .sub{ color:oklch(1 0 0 / .85); }
+body[data-hero="bold"] .hero .note{ color:oklch(1 0 0 / .7); }
+body[data-hero="bold"] .eyebrow{ color:oklch(1 0 0 / .9); }
+body[data-hero="bold"] .btn:not(.primary){ background:oklch(1 0 0 / .12); border-color:oklch(1 0 0 / .3); color:#fff; }
+body[data-hero="bold"] .btn.primary{ background:#fff; color:var(--primary-deep); border-color:#fff; }
+
+/* hero app mock */
+.mock{ background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow-lg); overflow:hidden; }
+.mock-bar{ display:flex; align-items:center; gap:7px; padding:11px 14px; border-bottom:1px solid var(--line); background:var(--surface-2); }
+.dot{ width:10px; height:10px; border-radius:50%; }
+.mock-body{ padding:20px; }
+.mock-eyebrow{ font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--primary); font-weight:600; }
+.mock h3{ font-size:17px; margin-top:6px; }
+.mock .inj{ margin-top:14px; border:1px solid var(--line); border-radius:10px; padding:13px; background:var(--surface-2); }
+.mock .inj .q{ font-size:13.5px; font-weight:600; }
+.mock .opt{ display:flex; align-items:center; gap:9px; margin-top:9px; font-size:12.5px; color:var(--ink-soft); }
+.mock .opt .b{ width:18px; height:18px; border-radius:5px; border:1.5px solid var(--line); flex:none; }
+.mock .opt.correct .b{ background:var(--ok); border-color:var(--ok); }
+.mock .opt.correct{ color:var(--ink); font-weight:600; }
+@media (max-width:860px){ .hero-in{ grid-template-columns:1fr; gap:34px; padding:52px 0 58px; } .mock{ order:-1; } }
+
+/* ---- hero decoration (radar / readiness motif) ---- */
+.hero{ position:relative; overflow:hidden; }
+.hero-in{ position:relative; z-index:1; }
+.hero-deco{ position:absolute; top:-140px; right:-130px; width:600px; height:600px; pointer-events:none; z-index:0; color:var(--primary); opacity:.42; }
+.hero-deco .pulse{ transform-origin:center; animation:pulse 4.2s ease-out infinite; }
+.hero-deco .pulse2{ animation-delay:1.4s; } .hero-deco .pulse3{ animation-delay:2.8s; }
+@keyframes pulse{ 0%{ transform:scale(.35); opacity:.0; } 25%{ opacity:.7; } 100%{ transform:scale(1); opacity:0; } }
+@media (prefers-reduced-motion: reduce){ .hero-deco .pulse{ animation:none; } }
+body[data-hero="bold"] .hero-deco{ color:#fff; opacity:.22; }
+body[data-hero="plain"] .hero-deco{ opacity:.3; }
+@media (max-width:860px){ .hero-deco{ width:380px; height:380px; top:-90px; right:-110px; } }
+
+/* ---- demo video ---- */
+.video{ background:var(--surface-2); border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:78px 0; }
+.video .frame-wrap{ max-width:900px; margin:0 auto; }
+.video-card{ position:relative; border-radius:18px; overflow:hidden; box-shadow:var(--shadow-lg); border:1px solid var(--line); background:#0c1326; aspect-ratio:16 / 9; }
+.video-card iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; display:block; }
+.video .cap{ text-align:center; color:var(--muted); font-size:13.5px; margin-top:16px; font-family:var(--mono); letter-spacing:.04em; }
+
+/* ---- logos / audience strip ---- */
+.strip{ padding:26px 0; border-bottom:1px solid var(--line); background:var(--surface); }
+.strip-in{ display:flex; align-items:center; gap:14px 30px; flex-wrap:wrap; justify-content:center; color:var(--muted); font-size:13.5px; font-weight:600; letter-spacing:.02em; }
+.strip .lbl{ font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+.strip .pill{ padding:6px 13px; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); }
+
+/* ---- sections ---- */
+section.block{ padding:84px 0; }
+.sec-head{ max-width:38em; margin:0 auto 52px; text-align:center; }
+.sec-head h2{ font-size:clamp(28px,3.6vw,40px); }
+.sec-head p{ color:var(--ink-soft); font-size:18px; margin-top:14px; }
+
+.steps{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; }
+.step{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:24px; box-shadow:var(--shadow-sm); }
+.step .n{ font-family:var(--mono); font-size:13px; font-weight:600; color:var(--primary); }
+.step h3{ font-size:18px; margin-top:10px; }
+.step p{ color:var(--ink-soft); font-size:14.5px; margin-top:8px; }
+@media (max-width:860px){ .steps{ grid-template-columns:1fr 1fr; } }
+@media (max-width:520px){ .steps{ grid-template-columns:1fr; } }
+
+.feat-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+.feat{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:26px; }
+.feat .ic{ width:44px; height:44px; border-radius:11px; background:var(--primary-soft); display:grid; place-items:center; }
+.feat .ic svg{ width:22px; height:22px; color:var(--primary-deep); }
+.feat h3{ font-size:17px; margin-top:16px; }
+.feat p{ color:var(--ink-soft); font-size:14.5px; margin-top:8px; }
+@media (max-width:860px){ .feat-grid{ grid-template-columns:1fr; } }
+
+/* ---- pricing ---- */
+.pricing{ background:var(--surface-2); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.price-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; align-items:start; }
+.plan{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:30px; display:flex; flex-direction:column; box-shadow:var(--shadow-sm); }
+.plan.featured{ border:2px solid var(--primary); box-shadow:var(--shadow-lg); position:relative; }
+.plan .tag{ position:absolute; top:-12px; left:30px; background:var(--primary); color:#fff; font-size:12px; font-weight:600; padding:4px 12px; border-radius:999px; }
+.plan h3{ font-size:20px; }
+.plan .desc{ color:var(--muted); font-size:14px; margin-top:6px; min-height:42px; }
+.plan .price{ margin:18px 0 4px; display:flex; align-items:baseline; gap:6px; }
+.plan .price .amt{ font-size:42px; font-weight:800; letter-spacing:-.03em; }
+.plan .price .per{ color:var(--muted); font-size:15px; font-weight:500; }
+.plan .subprice{ font-size:13px; color:var(--muted); min-height:20px; }
+.plan ul{ list-style:none; margin:20px 0 0; padding:0; display:flex; flex-direction:column; gap:11px; }
+.plan li{ display:flex; gap:10px; font-size:14.5px; color:var(--ink-soft); }
+.plan li svg{ width:19px; height:19px; color:var(--ok); flex:none; margin-top:1px; }
+.plan .btn{ margin-top:26px; justify-content:center; width:100%; }
+@media (max-width:860px){ .price-grid{ grid-template-columns:1fr; } }
+
+/* ---- faq ---- */
+.faq{ max-width:760px; margin:0 auto; display:flex; flex-direction:column; gap:0; }
+details{ border-bottom:1px solid var(--line); padding:20px 4px; }
+details summary{ cursor:pointer; font-weight:600; font-size:16.5px; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:14px; }
+details summary::-webkit-details-marker{ display:none; }
+details summary .pm{ font-size:22px; color:var(--primary); font-weight:400; transition:transform .2s; }
+details[open] summary .pm{ transform:rotate(45deg); }
+details p{ color:var(--ink-soft); font-size:15px; margin-top:13px; }
+
+/* ---- cta band ---- */
+.band{ background:linear-gradient(150deg, var(--primary-deep), var(--primary)); color:#fff; }
+.band-in{ text-align:center; padding:72px 0; }
+.band h2{ font-size:clamp(28px,3.6vw,40px); }
+.band p{ font-size:18px; color:oklch(1 0 0 / .85); margin-top:14px; }
+.band .btn{ margin-top:28px; }
+.band .btn.primary{ background:#fff; color:var(--primary-deep); border-color:#fff; }
+
+/* ---- footer ---- */
+footer{ background:var(--surface); border-top:1px solid var(--line); padding:42px 0; }
+.foot-in{ display:flex; justify-content:space-between; gap:20px; align-items:center; flex-wrap:wrap; color:var(--muted); font-size:14px; }
+.foot-in a{ color:var(--ink-soft); font-weight:500; }
+
+/* ---- style switcher ---- */
+.switcher{ position:fixed; right:18px; bottom:18px; z-index:80; background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow-lg); padding:14px 16px; width:236px; font-size:13px; }
+.switcher .sh{ font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+.switcher .row{ margin-top:12px; }
+.switcher .row .lab{ font-weight:600; font-size:12px; margin-bottom:7px; color:var(--ink-soft); }
+.sw-opts{ display:flex; gap:7px; flex-wrap:wrap; }
+.sw-swatch{ width:26px; height:26px; border-radius:7px; cursor:pointer; border:2px solid transparent; }
+.sw-swatch.sel{ border-color:var(--ink); }
+.sw-chip{ padding:6px 11px; border:1.5px solid var(--line); border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; color:var(--ink-soft); background:var(--surface); }
+.sw-chip.sel{ border-color:var(--primary); background:var(--primary-soft); color:var(--primary-deep); }
+.switcher .close{ position:absolute; top:10px; right:12px; cursor:pointer; color:var(--muted); font-size:16px; border:none; background:none; }
+.switcher.min{ width:auto; padding:11px 14px; cursor:pointer; }
+.switcher.min .body{ display:none; }
+.switcher.min .sh::after{ content:" · tap to style"; }
+</style>
+</head>
+<body data-accent="blue" data-hero="soft">
+
+<!-- NAV -->
+<nav>
+  <div class="wrap nav-in">
+    <div class="brand">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+      DrillFrame
+    </div>
+    <div class="nav-links">
+      <a href="#demo">Demo</a>
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn" href="#pricing">Sign in</a>
+      <a class="btn primary" href="#pricing">Start free trial</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <svg class="hero-deco" viewBox="0 0 600 600" fill="none" aria-hidden="true">
+    <g stroke="currentColor" stroke-width="1.5">
+      <circle cx="300" cy="300" r="70" opacity=".5"/>
+      <circle cx="300" cy="300" r="130" opacity=".38"/>
+      <circle cx="300" cy="300" r="195" opacity=".26"/>
+      <circle cx="300" cy="300" r="262" opacity=".16"/>
+    </g>
+    <circle class="pulse" cx="300" cy="300" r="262" fill="currentColor" opacity=".08"/>
+    <circle class="pulse pulse2" cx="300" cy="300" r="262" fill="currentColor" opacity=".08"/>
+    <circle class="pulse pulse3" cx="300" cy="300" r="262" fill="currentColor" opacity=".08"/>
+    <g fill="currentColor">
+      <circle cx="300" cy="300" r="7"/>
+      <circle cx="430" cy="300" r="4.5" opacity=".7"/>
+      <circle cx="230" cy="170" r="4" opacity=".55"/>
+      <circle cx="360" cy="450" r="4" opacity=".5"/>
+    </g>
+  </svg>
+  <div class="wrap hero-in">
+    <div>
+      <div class="eyebrow">Tabletop exercises · any procedure</div>
+      <h1>Rehearse the emergency before it happens.</h1>
+      <p class="sub">DrillFrame turns your emergency, security, safety, or SOP document into a structured, scored tabletop drill — in minutes. Run it on a screen or send everyone a join link, then export a sign-off-ready report.</p>
+      <div class="cta-row">
+        <a class="btn primary lg" href="#pricing">Start your free trial</a>
+        <a class="btn lg" href="#how">See how it works</a>
+      </div>
+      <p class="note">14-day free trial · No card required · Works in any browser</p>
+    </div>
+    <div class="mock">
+      <div class="mock-bar">
+        <span class="dot" style="background:#ef6f6f"></span><span class="dot" style="background:#f2c14e"></span><span class="dot" style="background:#6fcf97"></span>
+        <span style="margin-left:8px;font-size:12px;color:var(--muted);font-family:var(--mono)">DrillFrame · Inject 3 / 6</span>
+      </div>
+      <div class="mock-body">
+        <div class="mock-eyebrow">Emergency Response · Fire</div>
+        <h3>Smoke reported in the main warehouse</h3>
+        <div class="inj">
+          <div class="q">Who has authority to order a full evacuation?</div>
+          <div class="opt correct"><span class="b"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg></span> The Incident Controller on shift</div>
+          <div class="opt"><span class="b"></span> Any employee who sees smoke</div>
+          <div class="opt"><span class="b"></span> Only the site director, once on site</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- DEMO VIDEO -->
+<section class="video" id="demo">
+  <div class="wrap">
+    <div class="sec-head" style="margin-bottom:34px">
+      <div class="eyebrow">See it in action</div>
+      <h2>From plan to practised — in fifteen seconds</h2>
+    </div>
+    <div class="frame-wrap">
+      <div class="video-card">
+        <iframe src="explainer.html" title="DrillFrame explainer video" allow="autoplay"></iframe>
+      </div>
+      <div class="cap">Tap play · 15-second overview</div>
+    </div>
+  </div>
+</section>
+<div class="strip">
+  <div class="wrap strip-in">
+    <span class="lbl">Built for</span>
+    <span class="pill">Ports &amp; Terminals</span>
+    <span class="pill">HSSE Departments and Officers</span>
+    <span class="pill">Facilities needing evacuation drills</span>
+    <span class="pill">Security consultants</span>
+    <span class="pill">SOP &amp; compliance teams</span>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="block" id="how">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">How it works</div>
+      <h2>From procedure to scored drill in four steps</h2>
+      <p>No scenario writing. No spreadsheets. Upload once and DrillFrame builds the exercise around your own plan.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">01</div><h3>Upload your procedure</h3><p>Drop in your emergency plan, security plan, or SOP — PDF or Word. It stays in your browser.</p></div>
+      <div class="step"><div class="n">02</div><h3>Pick the scenario</h3><p>DrillFrame reads the document and offers the specific emergencies it covers. Choose one and set the difficulty.</p></div>
+      <div class="step"><div class="n">03</div><h3>Run the drill</h3><p>Walk the team through decision injects on a shared screen, or send a join link so everyone answers on their phone.</p></div>
+      <div class="step"><div class="n">04</div><h3>Score &amp; sign off</h3><p>Get per-person and per-role scores, a team result, and an audit-ready report to export as PDF.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="block" id="features" style="background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">What you get</div>
+      <h2>Everything a credible drill needs</h2>
+    </div>
+    <div class="feat-grid">
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div><h3>Grounded in your plan</h3><p>Every scenario, model answer and reference is generated from your uploaded procedure — not generic boilerplate.</p></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3>Live or facilitator mode</h3><p>Run solo on a projected screen, or have everyone join on their own device with a room code and QR link.</p></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div><h3>Per-person &amp; per-role scoring</h3><p>See who was assigned what, how each person scored, and the overall team result — at a glance.</p></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><circle cx="12" cy="12" r="4"/></svg></div><h3>Adjustable difficulty</h3><p>Easy for awareness sessions, hard for seasoned teams — the obvious answers stop being obvious.</p></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></div><h3>Sign-off-ready reports</h3><p>Export a clean PDF with scores, notes and an attestation block for your training records and audits.</p></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h3>Your data stays yours</h3><p>Documents are read in the browser — nothing is uploaded to us. Reusable scenario libraries are saved per organisation.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="block pricing" id="pricing">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Pricing</div>
+      <h2>Simple pricing for teams that drill</h2>
+      <p>Most teams drill quarterly — so we price by the year, not by the month. Two drills and it's paid for itself.</p>
+    </div>
+    <div class="price-grid">
+      <div class="plan">
+        <h3>Free trial</h3>
+        <div class="desc">Try a full drill end-to-end before you commit.</div>
+        <div class="price"><span class="amt">$0</span><span class="per">/ 14 days</span></div>
+        <div class="subprice">No card required</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> One full drill, all features</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> Upload your own procedure</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> Export a sample report</li>
+        </ul>
+        <a class="btn" href="mailto:jked1.095@gmail.com?subject=DrillFrame%20free%20trial">Start free trial</a>
+      </div>
+      <div class="plan featured">
+        <span class="tag">Most popular</span>
+        <h3>DrillFrame Pro</h3>
+        <div class="desc">Unlimited drills for one organisation, all year.</div>
+        <div class="price"><span class="amt">$290</span><span class="per">/ year</span></div>
+        <div class="subprice">≈ $24/mo · or $29/mo billed monthly</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> Unlimited drills &amp; participants</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> Live join links &amp; QR codes</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> Reusable scenario libraries</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> Per-person &amp; per-role scoring</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> All future updates</li>
+        </ul>
+        <a class="btn primary" href="mailto:jked1.095@gmail.com?subject=DrillFrame%20Pro%20subscription">Get DrillFrame Pro</a>
+      </div>
+      <div class="plan">
+        <h3>Facilitated drill</h3>
+        <div class="desc">We run the exercise for your team, start to finish.</div>
+        <div class="price"><span class="amt">$500</span><span class="per">/ session</span></div>
+        <div class="subprice">US local · overseas quoted on request</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> Scenario built from your plan</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> Live-facilitated by us</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg> Full debrief &amp; signed report</li>
+        </ul>
+        <a class="btn" href="mailto:jked1.095@gmail.com?subject=DrillFrame%20facilitated%20session">Book a session</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="block" id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">FAQ</div>
+      <h2>Questions, answered</h2>
+    </div>
+    <div class="faq">
+      <details open><summary>Do I need any software installed?<span class="pm">+</span></summary><p>No. DrillFrame runs in any modern browser — on a laptop for facilitator mode, or on participants' phones for live mode. Nothing to install.</p></details>
+      <details><summary>Where do my uploaded plans go?<span class="pm">+</span></summary><p>They're read entirely inside your browser to build the scenario — the document itself is never uploaded to a server. Your reusable scenario libraries are stored locally per organisation.</p></details>
+      <details><summary>What's this about an AI key?<span class="pm">+</span></summary><p>DrillFrame uses AI to turn your procedure into scenarios. On Pro you connect a low-cost AI key in about two minutes (we walk you through it) — a typical drill costs a fraction of a cent to generate. We're rolling out a fully-managed option where you won't need a key at all.</p></details>
+      <details><summary>Can I use it for any kind of drill?<span class="pm">+</span></summary><p>Yes — emergency response, fire and evacuation, security (ISPS and others), safety, and standard operating procedures. If it's a written plan, you can rehearse it.</p></details>
+      <details><summary>What if I'd rather you just ran it for us?<span class="pm">+</span></summary><p>That's the Facilitated Drill option. We build the scenario from your plan and run the whole exercise for your team, then hand over a signed report. $500 per session locally in the US; overseas quoted on request.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BAND -->
+<section class="band">
+  <div class="wrap band-in">
+    <h2>Run your next drill with confidence.</h2>
+    <p>Start free today, or have us facilitate your first session.</p>
+    <a class="btn primary lg" href="mailto:jked1.095@gmail.com?subject=DrillFrame%20free%20trial">Start your free trial</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap foot-in">
+    <div class="brand" style="font-size:17px"><span class="mark" style="width:28px;height:28px"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span> DrillFrame</div>
+    <div>Questions? <a href="mailto:jked1.095@gmail.com">jked1.095@gmail.com</a></div>
+    <div>© 2026 DrillFrame</div>
+  </div>
+</footer>
+
+<!-- STYLE SWITCHER -->
+<div class="switcher" id="switcher">
+  <div class="sh">Style preview</div>
+  <button class="close" id="swClose" title="Minimise">−</button>
+  <div class="body">
+    <div class="row">
+      <div class="lab">Accent</div>
+      <div class="sw-opts" id="swAccent">
+        <div class="sw-swatch sel" data-accent="blue" style="background:oklch(0.52 0.11 252)"></div>
+        <div class="sw-swatch" data-accent="teal" style="background:oklch(0.55 0.09 200)"></div>
+        <div class="sw-swatch" data-accent="indigo" style="background:oklch(0.48 0.14 276)"></div>
+        <div class="sw-swatch" data-accent="slate" style="background:oklch(0.40 0.03 255)"></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lab">Hero treatment</div>
+      <div class="sw-opts" id="swHero">
+        <div class="sw-chip sel" data-hero="soft">Soft</div>
+        <div class="sw-chip" data-hero="bold">Bold</div>
+        <div class="sw-chip" data-hero="plain">Plain</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var body = document.body;
+  function wire(groupId, attr){
+    var grp = document.getElementById(groupId);
+    grp.addEventListener("click", function(e){
+      var t = e.target.closest("[data-"+attr+"]"); if(!t) return;
+      body.setAttribute("data-"+attr, t.getAttribute("data-"+attr));
+      grp.querySelectorAll("[data-"+attr+"]").forEach(function(el){ el.classList.toggle("sel", el===t); });
+      try{ localStorage.setItem("df_"+attr, t.getAttribute("data-"+attr)); }catch(_){}
+    });
+    try{ var saved = localStorage.getItem("df_"+attr); if(saved){
+      body.setAttribute("data-"+attr, saved);
+      grp.querySelectorAll("[data-"+attr+"]").forEach(function(el){ el.classList.toggle("sel", el.getAttribute("data-"+attr)===saved); });
+    }}catch(_){}
+  }
+  wire("swAccent","accent");
+  wire("swHero","hero");
+  document.getElementById("swClose").addEventListener("click", function(e){
+    e.stopPropagation();
+    document.getElementById("switcher").classList.add("min");
+  });
+  document.getElementById("switcher").addEventListener("click", function(){
+    if(this.classList.contains("min")) this.classList.remove("min");
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>DrillFrame — Tabletop Drill Facilitator</title>
+  <meta name="description" content="Turn any emergency, security, safety or SOP document into a structured, scored tabletop drill — with live join, scoring and an audit-ready report.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <!-- PWA / installable app -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#3b5bbf">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="DrillFrame">
+  <link rel="apple-touch-icon" href="icons/apple-touch-180.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- data + config -->
+  <script src="js/config.js"></script>
+  <script src="js/scenarios.js"></script>
+  <!-- services -->
+  <script src="js/tts.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/sync.js"></script>
+  <!-- screens -->
+  <script src="js/drill.js"></script>
+  <script src="js/results.js"></script>
+  <script src="js/report.js"></script>
+  <script src="js/participant.js"></script>
+  <!-- core (boots on DOMContentLoaded) -->
+  <script src="js/app.js"></script>
+  <!-- PWA service worker -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+      // Capture the install prompt so the app can offer an "Install" button
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        window.__deferredInstall = e;
+        window.dispatchEvent(new Event("df-installable"));
+      });
+    }
+  </script>
+</body>
+</html>

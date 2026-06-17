@@ -33,21 +33,21 @@ const CONFIG_FIREBASE = {
 
 const DEFAULT_CONFIG = {
   org: {
-    name: "Spring Garden Terminal",
+    name: "",
     logoDataUrl: ""            // optional base64 logo, set via Settings
   },
   facility: {
-    name: "Spring Garden Terminal",
-    location: "St. Michael, Barbados",
-    planTitle: "Port Facility Security Plan (PFSP)",
-    planRef: "Manual No. SP 01",
-    standard: "ISPS Code · SOLAS Ch. XI-2",
-    type: "marine bulk LPG terminal — shore storage tanks linked by pipeline to a remote sea berth; ISPS security measures apply while a gas carrier is alongside discharging",
-    planText: ""   // paste your full plan text via Settings to ground AI-generated scenarios
+    name: "",
+    location: "",
+    planTitle: "",
+    planRef: "",
+    standard: "",
+    type: "",
+    planText: ""   // upload your procedure via Settings to ground AI-generated scenarios
   },
   pfso: {
-    name: "Junair DeSouza",
-    position: "Port Facility Security Officer",
+    name: "",
+    position: "",
     phone: "(246) 417 6403",
     email: "j.desouza@rubis-caribbean.com"
   },
@@ -95,6 +95,26 @@ function loadConfig() {
 }
 function saveConfig(cfg) { localStorage.setItem("tdf_config", JSON.stringify(cfg)); }
 function resetConfig() { localStorage.removeItem("tdf_config"); }
+
+/* ---- Per-document scenario libraries ("folders") ----
+   Each uploaded procedure gets its own folder of generated scenarios,
+   keyed by a cheap signature of the procedure text so re-uploading the
+   same document reuses (rather than regenerates) its scenarios. */
+function loadLibraries() {
+  try { const l = JSON.parse(localStorage.getItem("tdf_libraries") || "null"); if (l && Array.isArray(l.folders)) return l; } catch (e) {}
+  return { folders: [] };
+}
+function saveLibraries(lib) {
+  try { localStorage.setItem("tdf_libraries", JSON.stringify(lib)); }
+  catch (e) { /* quota — drop oldest folder's cached injects and retry once */
+    try { (lib.folders||[]).forEach(f => (f.scenarios||[]).forEach(s => { if (s.injects) delete s.injects; })); localStorage.setItem("tdf_libraries", JSON.stringify(lib)); } catch (_) {}
+  }
+}
+function planSig(text) {
+  const t = (text || "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  return t.length + ":" + t.slice(0, 60) + ":" + t.slice(-60);
+}
 
 function deepMerge(base, over) {
   for (const k in over) {
