@@ -977,7 +977,10 @@ function renderBrief() {
             <h1 style="font-size:28px;letter-spacing:-0.02em">${esc(fill(scn.title, S.vars))}</h1>
             <p class="lede" style="font-size:16px;margin-top:10px">${esc(fill(scn.synopsis, S.vars))}</p>
             <div class="reveal" style="border-left-color:var(--primary);margin-top:18px">
-              <div class="r-h">${ICON.doc} Situation brief</div>
+              <div class="r-h" style="display:flex;align-items:center;gap:10px">${ICON.doc} Situation brief
+                <button class="iconbtn ${TTS.isEnabled()?'active':''}" id="playBrief" title="Play the brief aloud" style="margin-left:auto">${ICON.mic}</button>
+                <span id="briefSpeakInd" style="display:none;color:var(--primary)"><span class="speaking-bars"><span></span><span></span><span></span><span></span></span></span>
+              </div>
               <p style="font-size:16px;color:var(--ink)">${esc(setup)}</p>
             </div>
           </div>
@@ -1024,12 +1027,35 @@ function renderBrief() {
     </div>
   </div>`;
 
-  $("#backSetup").onclick = () => { S.step = "setup"; saveSession(); render(); };
+  $("#backSetup").onclick = () => { TTS.cancel(); S.step = "setup"; saveSession(); render(); };
   $("#regen").onclick = async () => {
+    TTS.cancel();
     if (S.scenarioMode === "ai") { await goToBrief.call(null); }
     else { resolveScenario(); render(); }
   };
-  $("#startDrill").onclick = () => { S.step = "drill"; if (!briefInProgress) S.cursor = 0; saveSession(); render(); };
+  $("#startDrill").onclick = () => { TTS.cancel(); S.step = "drill"; if (!briefInProgress) S.cursor = 0; saveSession(); render(); };
+
+  // ---- voiceover: read the situation brief aloud (title + synopsis + brief) ----
+  function speakBrief() {
+    TTS.speak([
+      fill(scn.title, S.vars),
+      fill(scn.synopsis, S.vars),
+      setup
+    ]);
+  }
+  const _playBrief = $("#playBrief");
+  if (_playBrief) _playBrief.onclick = () => { if (TTS.isSpeaking()) { TTS.cancel(); } else { speakBrief(); } };
+  TTS.onState(state => {
+    const sp = state === "speaking";
+    const ind = $("#briefSpeakInd"); if (ind) ind.style.display = sp ? "inline-flex" : "none";
+    if (_playBrief) _playBrief.classList.toggle("active", sp || TTS.isEnabled());
+  });
+  // Auto-read the brief on arrival (not when resuming an in-progress drill).
+  // Tie the "already spoke" flag to this scenario so a new/regenerated one reads again.
+  if (TTS.isEnabled() && TTS.isAutoRead() && !briefInProgress && S._briefSpokeId !== scn.id) {
+    S._briefSpokeId = scn.id; saveSession();
+    setTimeout(speakBrief, 300);
+  }
 }
 
 /* ===========================================================
