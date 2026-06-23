@@ -35,6 +35,17 @@ function h(html) { const t = document.createElement("template"); t.innerHTML = h
 function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function uid() { return Math.random().toString(36).slice(2, 9); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
+
+/* ---- participant role helpers (one person may hold more than one role) ---- */
+function pRoleIds(p) {
+  if (p && Array.isArray(p.roleIds) && p.roleIds.length) return p.roleIds.slice();
+  if (p && p.roleId) return [p.roleId];
+  return [];
+}
+function pHasRole(p, rid) { return pRoleIds(p).includes(rid); }
+function pRoleNames(p) { return pRoleIds(p).map(id => roleById(CFG, id).name).filter(Boolean); }
+function pRoleShorts(p) { return pRoleIds(p).map(id => { const r = roleById(CFG, id); return r.short || r.name; }).filter(Boolean); }
+function pRoleLabel(p) { const n = pRoleNames(p); return n.length ? n.join(" + ") : "\u2014"; }
 function fmtDate(iso) { try { return new Date(iso + (iso.length === 10 ? "T00:00:00" : "")).toLocaleDateString(undefined, { weekday:"short", year:"numeric", month:"short", day:"numeric" }); } catch(e){ return iso; } }
 function fmtDateTime(iso) { try { return new Date(iso).toLocaleString(undefined, { dateStyle:"medium", timeStyle:"short" }); } catch(e){ return iso; } }
 
@@ -161,6 +172,48 @@ function saveSession() { try { localStorage.setItem("tdf_session", JSON.stringif
 function loadSession() { try { return JSON.parse(localStorage.getItem("tdf_session") || "null"); } catch(e){ return null; } }
 function clearSession() { localStorage.removeItem("tdf_session"); }
 
+/* ---------------- reusable “profile” (saved details) ----------------
+   A new/fresh session starts with empty fields. Before clearing, we stash
+   the reusable bits (organisation, procedure & roles, facilitator) so the
+   user can one-click restore them via “Use saved details”. */
+function saveProfile() {
+  try {
+    const hasAnything = (CFG.facility && (CFG.facility.name || CFG.facility.planText))
+      || (CFG.roles && CFG.roles.length) || (S.facilitator && S.facilitator.name);
+    if (!hasAnything) return;
+    localStorage.setItem("tdf_profile", JSON.stringify({
+      facility: structuredClone(CFG.facility),
+      roles: structuredClone(CFG.roles || []),
+      facilitator: Object.assign({}, S.facilitator),
+      savedISO: new Date().toISOString()
+    }));
+  } catch (e) {}
+}
+function loadProfile() { try { return JSON.parse(localStorage.getItem("tdf_profile") || "null"); } catch(e){ return null; } }
+function applyProfile() {
+  const p = loadProfile(); if (!p) return;
+  if (p.facility) { CFG.facility = deepMerge(CFG.facility || {}, structuredClone(p.facility)); if (p.facility.name) CFG.org.name = p.facility.name; }
+  if (p.roles && p.roles.length) CFG.roles = structuredClone(p.roles);
+  saveConfig(CFG);
+  if (p.facilitator) S.facilitator = Object.assign({ name:"", position:"Facilitator", email:"" }, p.facilitator);
+  saveSession();
+  renderSetup();
+  toast("Saved details loaded");
+}
+function startFresh() {
+  saveProfile();
+  // empty the reusable procedure fields & roles (branding/logo & settings are kept)
+  CFG.org.name = "";
+  CFG.facility.name = ""; CFG.facility.planTitle = ""; CFG.facility.location = "";
+  CFG.facility.planRef = ""; CFG.facility.type = ""; CFG.facility.planText = "";
+  CFG.roles = [];
+  saveConfig(CFG);
+  S = newSession();
+  clearSession();
+  render();
+  toast(loadProfile() ? "Fresh session — your details are saved, use “Use saved details” to reuse them" : "Fresh session started");
+}
+
 /* ---------------- scenario resolution ---------------- */
 function rnd(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function buildVars() {
@@ -247,6 +300,7 @@ function renderTopbar() {
     <div class="spacer"></div>
     <div class="tb-actions">
       ${showLevel ? `<span class="level-badge level-${lvl}"><span class="dot"></span>${esc(lvlMeta.name)} \u00b7 ${esc(lvlMeta.tag)}</span>`:""}
+      <button class="iconbtn" id="installApp" title="Install DrillFrame as an app" style="display:none">${ICON.download}</button>
       <button class="iconbtn ${TTS.isEnabled()?'active':''}" id="ttsToggle" title="AI voiceover ${TTS.isEnabled()?'on':'off'}">${TTS.isEnabled()?ICON.mic:ICON.micOff}</button>
       <button class="iconbtn" id="openSettings" title="Settings">${ICON.settings}</button>
     </div>
@@ -255,6 +309,18 @@ function renderTopbar() {
 function wireTopbar() {
   const home = $("#homeBtn");
   if (home) home.onclick = () => { if (S.mode === "participant") return; S.step = "setup"; saveSession(); render(); };
+  const inst = $("#installApp");
+  if (inst) {
+    const showInst = () => { if (window.__deferredInstall) inst.style.display = ""; };
+    showInst();
+    window.addEventListener("df-installable", showInst);
+    inst.onclick = async () => {
+      const ev = window.__deferredInstall; if (!ev) return;
+      ev.prompt();
+      try { await ev.userChoice; } catch(e){}
+      window.__deferredInstall = null; inst.style.display = "none";
+    };
+  }
   const tg = $("#ttsToggle");
   if (tg) tg.onclick = () => {
     const now = !TTS.isEnabled();
@@ -345,6 +411,8 @@ function renderSetup() {
       </div>
     </div>
 
+    <div id="prefillBar"></div>
+
     <div class="card pad stack" id="procCard">
       <div>
         <div class="eyebrow">Step 1 \u00b7 Procedure</div>
@@ -412,7 +480,7 @@ function renderSetup() {
         <div>
           <div class="eyebrow">Step 3 \u00b7 Attendance</div>
           <h2 style="margin-top:6px;font-size:22px">Participants &amp; roles</h2>
-          <p class="muted small" style="margin-top:4px">Everyone is asked each question; the role responsible at that step is the one scored. Add each attendee and assign a role.</p>
+          <p class="muted small" style="margin-top:4px">Everyone is asked each question; the role responsible at that step is the one scored. Add each attendee and assign one or more roles — in a small team one person can hold several.</p>
         </div>
         <button class="btn sm" id="addP">${ICON.plus} Add participant</button>
       </div>
@@ -435,6 +503,7 @@ function renderSetup() {
 
   renderParticipants();
   renderScenarioChoice();
+  renderPrefillBar();
 
   // bind session fields
   const bind = (id, fn) => { const e = $(id); if (e) e.oninput = () => { fn(e.value); saveSession(); }; };
@@ -505,10 +574,10 @@ function renderSetup() {
   const genLibProcBtn = $("#genLibProc");
   if (genLibProcBtn) genLibProcBtn.onclick = () => generateLibrary("#genLibProc");
 
-  $("#addP").onclick = () => { if (!CFG.roles.length) { toast("Add at least one response role first"); return; } S.participants.push({ id: uid(), name: "", email: "", roleId: CFG.roles[0].id }); saveSession(); renderParticipants(); };
+  $("#addP").onclick = () => { if (!CFG.roles.length) { toast("Add at least one response role first"); return; } S.participants.push({ id: uid(), name: "", email: "", roleIds: [CFG.roles[0].id], roleId: CFG.roles[0].id }); saveSession(); renderParticipants(); };
   $("#resetAll").onclick = () => {
-    modal({ title: "Start a fresh session?", body: `<p class="muted">This clears the current participants, scenario and any answers recorded. Settings &amp; branding are kept.</p>`,
-      foot: [ h(`<button class="btn" data-close>Cancel</button>`), (()=>{ const b=h(`<button class="btn danger">Yes, reset</button>`); b.onclick=()=>{ S = newSession(); clearSession(); closeModal(); render(); }; return b; })() ] });
+    modal({ title: "Start a fresh session?", body: `<p class="muted">This clears the procedure, participants, scenario and any recorded answers, leaving empty fields for a new drill. Your current details (organisation, procedure &amp; roles) are <strong>saved first</strong> — bring them back any time with one click via <em>“Use saved details”</em>. Branding &amp; settings are kept.</p>`,
+      foot: [ h(`<button class="btn" data-close>Cancel</button>`), (()=>{ const b=h(`<button class="btn danger">Start fresh</button>`); b.onclick=()=>{ closeModal(); startFresh(); }; return b; })() ] });
   };
   $("#toBrief").onclick = goToBrief;
 
@@ -563,19 +632,57 @@ function renderParticipants() {
     list.innerHTML = `<div class="empty">No participants yet. Add the team members taking part \u2014 in the room or remote.</div>`;
     return;
   }
-  const roleOpts = (sel) => CFG.roles.map(r => `<option value="${r.id}" ${r.id===sel?"selected":""}>${esc(r.name)}</option>`).join("");
   list.innerHTML = "";
   S.participants.forEach(p => {
-    const row = h(`<div class="prow">
+    if (!Array.isArray(p.roleIds)) p.roleIds = p.roleId ? [p.roleId] : [];
+    const row = h(`<div class="prow prow-roles">
       <input type="text" data-k="name" placeholder="Full name" value="${esc(p.name)}">
       <input type="email" data-k="email" placeholder="Email" value="${esc(p.email)}">
-      <select data-k="roleId">${roleOpts(p.roleId)}</select>
+      <div class="role-pick" title="Tap each role this person holds \u2014 a person can have more than one"></div>
       <button class="iconbtn del" title="Remove">${ICON.trash}</button>
     </div>`);
+    const pick = $(".role-pick", row);
+    if (!CFG.roles.length) {
+      pick.innerHTML = `<span class="muted small">Add roles in Step 1 first.</span>`;
+    } else {
+      CFG.roles.forEach(r => {
+        const on = p.roleIds.includes(r.id);
+        const chip = h(`<button type="button" class="role-chip ${on?'on':''}">${esc(r.short || r.name)}</button>`);
+        chip.title = r.name;
+        chip.onclick = () => {
+          const i = p.roleIds.indexOf(r.id);
+          if (i >= 0) p.roleIds.splice(i, 1); else p.roleIds.push(r.id);
+          p.roleId = p.roleIds[0] || null;   // keep legacy single-role field roughly in sync
+          chip.classList.toggle("on");
+          saveSession();
+        };
+        pick.append(chip);
+      });
+    }
     $$("[data-k]", row).forEach(inp => inp.oninput = () => { p[inp.dataset.k] = inp.value; saveSession(); });
     $(".del", row).onclick = () => { S.participants = S.participants.filter(x => x.id !== p.id); saveSession(); renderParticipants(); };
     list.append(row);
   });
+}
+
+function renderPrefillBar() {
+  const w = $("#prefillBar"); if (!w) return;
+  const prof = loadProfile();
+  const fieldsEmpty = !(CFG.facility.name || CFG.facility.planText || (CFG.roles && CFG.roles.length));
+  if (!prof || !fieldsEmpty) { w.innerHTML = ""; return; }
+  const bits = [];
+  if (prof.facility && prof.facility.name) bits.push(esc(prof.facility.name));
+  if (prof.facility && prof.facility.planTitle) bits.push(esc(prof.facility.planTitle));
+  const nRoles = (prof.roles || []).length;
+  if (nRoles) bits.push(nRoles + " role" + (nRoles > 1 ? "s" : ""));
+  w.innerHTML = `<div class="prefill-bar">
+    <span class="pf-ic">${ICON.doc}</span>
+    <span class="pf-tx"><strong>Reuse your saved details?</strong><span class="muted small">${bits.join(" \u00b7 ") || "From your last drill"}</span></span>
+    <button class="btn sm" id="usePrefill" type="button">Use saved details</button>
+    <button class="iconbtn" id="dismissPrefill" type="button" title="Dismiss">${ICON.x}</button>
+  </div>`;
+  $("#usePrefill").onclick = applyProfile;
+  $("#dismissPrefill").onclick = () => { w.innerHTML = ""; };
 }
 
 function renderScenarioChoice() {
@@ -783,6 +890,8 @@ async function goToBrief() {
     if (S.participants.some(p => !p.name.trim())) { toast("Every participant needs a name"); return; }
   }
 
+  saveProfile();   // remember this complete setup so it can be reused next time
+
   const folder = activeFolder();
   const libScenarios = folder ? (folder.scenarios || []) : [];
 
@@ -846,6 +955,7 @@ async function goToBrief() {
 function renderBrief() {
   const scn = S.scenario; if (!scn) { S.step = "setup"; return render(); }
   const setup = fill(scn.setup, S.vars);
+  const briefInProgress = Array.isArray(S.answers) && S.answers.some(a => a && a.revealed);
   const rolesPresent = [...new Set(scn.injects.map(i => i.role))];
   const contactRows = CFG.contacts.map(c => `<div class="kv"><span class="k">${esc(c.label)}${c.note?` \u00b7 <span class="muted">${esc(c.note)}</span>`:""}</span><span class="v mono">${esc(c.value)}</span></div>`).join("");
   const commsRows = CFG.comms.map(c => `<div class="kv"><span class="k">${esc(c.use)}</span><span class="v mono">${esc(c.ch)}</span></div>`).join("");
@@ -886,7 +996,7 @@ function renderBrief() {
         <div class="card pad">
           <h3 style="font-size:16px;margin-bottom:12px">${ICON.users} Roles in play (${rolesPresent.length})</h3>
           <div style="display:flex;flex-wrap:wrap;gap:8px">
-            ${rolesPresent.map(rid => { const r = roleById(CFG,rid); const who = S.participants.filter(p=>p.roleId===rid).map(p=>p.name).filter(Boolean);
+            ${rolesPresent.map(rid => { const r = roleById(CFG,rid); const who = S.participants.filter(p=>pHasRole(p,rid)).map(p=>p.name).filter(Boolean);
               return `<span class="chip role" title="${esc(r.desc)}">${esc(r.name)}${who.length?` \u00b7 ${esc(who.join(", "))}`:""}</span>`; }).join("")}
           </div>
           <p class="muted small" style="margin-top:12px">${S.participants.length} registered \u00b7 facilitated by ${esc(S.facilitator.name)||"\u2014"}</p>
@@ -906,7 +1016,7 @@ function renderBrief() {
       <button class="btn ghost" id="backSetup">${ICON.chevL} Back to setup</button>
       <div style="display:flex;gap:10px">
         <button class="btn" id="regen">Regenerate scenario</button>
-        <button class="btn primary lg" id="startDrill">${ICON.play} Start the drill</button>
+        <button class="btn primary lg" id="startDrill">${ICON.play} ${briefInProgress ? "Resume drill" : "Start the drill"}</button>
       </div>
     </div>
   </div>`;
@@ -916,7 +1026,7 @@ function renderBrief() {
     if (S.scenarioMode === "ai") { await goToBrief.call(null); }
     else { resolveScenario(); render(); }
   };
-  $("#startDrill").onclick = () => { S.step = "drill"; S.cursor = 0; saveSession(); render(); };
+  $("#startDrill").onclick = () => { S.step = "drill"; if (!briefInProgress) S.cursor = 0; saveSession(); render(); };
 }
 
 /* ===========================================================

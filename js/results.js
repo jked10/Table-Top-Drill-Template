@@ -47,7 +47,7 @@ const ResultsScreen = (() => {
     return S.participants.map(p => {
       let answered = 0, correct = 0, pts = 0, max = 0, total = 0;
       scn.injects.forEach((inj, idx) => {
-        if (inj.role !== p.roleId) return;
+        if (!pHasRole(p, inj.role)) return;
         total++;
         const ans = S.answers[idx];
         const sc = DrillScreen.scoreOf(ans, inj);
@@ -85,7 +85,7 @@ const ResultsScreen = (() => {
     const roleBars = Object.entries(R.byRole).sort((a,b)=> (b[1].pts/b[1].max)-(a[1].pts/a[1].max)).map(([rid, v]) => {
       const p = v.max ? Math.round(v.pts/v.max*100) : 0;
       const r = roleById(CFG, rid);
-      const who = S.participants.filter(x=>x.roleId===rid).map(x=>x.name).filter(Boolean).join(", ");
+      const who = S.participants.filter(x=>pHasRole(x,rid)).map(x=>x.name).filter(Boolean).join(", ");
       const col = p>=85?"var(--ok)":p>=65?"var(--warn)":"var(--bad)";
       return `<div class="rolebar"><div class="rb-top"><span class="rb-name">${esc(r.name)}${who?` <span class="muted" style="font-weight:400">\u00b7 ${esc(who)}</span>`:""}</span><span class="rb-val">${v.pts}/${v.max} \u00b7 ${p}%</span></div>
         <div class="rb-track"><div class="rb-fill" style="width:${p}%;background:${col}"></div></div></div>`;
@@ -106,7 +106,7 @@ const ResultsScreen = (() => {
       </tr>`;
     }).join("");
 
-    const attendanceRows = S.participants.map(p => `<div class="kv"><span class="k">${esc(p.name)}${p.email?` \u00b7 <span class="muted">${esc(p.email)}</span>`:""}</span><span class="v">${esc(roleById(CFG,p.roleId).name)}</span></div>`).join("");
+    const attendanceRows = S.participants.map(p => `<div class="kv"><span class="k">${esc(p.name)}${p.email?` \u00b7 <span class="muted">${esc(p.email)}</span>`:""}</span><span class="v">${esc(pRoleLabel(p))}</span></div>`).join("");
 
     const pp = computePerPerson();
     const anyIndividual = pp.some(r => r.answered > 0);
@@ -124,7 +124,7 @@ const ResultsScreen = (() => {
           ${ppRows.slice().sort((a,b)=>b.pct-a.pct).map(r => { const col = r.pct>=85?'var(--ok)':r.pct>=65?'var(--warn)':'var(--bad)';
             const denom = useDerived ? r.total : totalInjects;
             return `<tr><td><strong>${esc(r.p.name||'\u2014')}</strong>${r.p.email?`<br><span class="muted" style="font-size:11px">${esc(r.p.email)}</span>`:''}</td>
-              <td>${esc(roleById(CFG,r.p.roleId).name)}</td>
+              <td>${esc(pRoleLabel(r.p))}</td>
               <td style="text-align:center">${r.answered}/${denom}</td>
               <td style="text-align:center">${r.correct}</td>
               <td style="text-align:center">${r.pts}/${r.max}</td>
@@ -218,7 +218,7 @@ const ResultsScreen = (() => {
         foot: [
           h(`<button class="btn" data-close>Cancel</button>`),
           (()=>{ const b=h(`<button class="btn">Re-run with a new scenario</button>`); b.onclick=()=>{ closeModal(); S.scenario=null; S.answers=[]; S.cursor=0; S.signoff={ name:"", position:"", attest:false, signature:"", signedISO:null }; S.notes=""; S.step="setup"; saveSession(); window.render(); }; return b; })(),
-          (()=>{ const b=h(`<button class="btn danger">Start completely fresh</button>`); b.onclick=()=>{ S = newSession(); clearSession(); closeModal(); window.render(); }; return b; })()
+          (()=>{ const b=h(`<button class="btn danger">Start completely fresh</button>`); b.onclick=()=>{ closeModal(); startFresh(); }; return b; })()
         ] });
     };
     $("#notes").oninput = e => { S.notes = e.target.value; saveSession(); };

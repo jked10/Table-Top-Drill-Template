@@ -36,7 +36,7 @@ const Report = (() => {
           synopsis: fill(scn.synopsis, S.vars), setup: fill(scn.setup, S.vars),
           startLevel: scn.startLevel, aiGenerated: !!scn.generated, variables: S.vars }
       },
-      attendance: S.participants.map(p => ({ name: p.name, email: p.email, role: roleById(CFG,p.roleId).name })),
+      attendance: S.participants.map(p => ({ name: p.name, email: p.email, role: pRoleNames(p).join(" + ") })),
       score: { teamPoints: R.teamPts, teamMax: R.teamMax, percent: R.pct,
         readiness: ResultsScreen.readiness(R.pct).label,
         byRole: Object.entries(R.byRole).map(([rid,v]) => ({ role: roleById(CFG,rid).name, points: v.pts, max: v.max, percent: v.max?Math.round(v.pts/v.max*100):0 })) },
@@ -50,7 +50,7 @@ const Report = (() => {
       })),
       notes: S.notes,
       individuals: S.capturePerPerson ? ResultsScreen.computePerPerson().filter(r=>r.answered>0).map(r => ({
-        name: r.p.name, email: r.p.email, role: roleById(CFG, r.p.roleId).name,
+        name: r.p.name, email: r.p.email, role: pRoleNames(r.p).join(" + "),
         answered: r.answered, correct: r.correct, points: r.pts, max: r.max, percent: r.pct
       })) : [],
       signoff: { name: S.signoff.name, position: S.signoff.position, attested: S.signoff.attest, signedAt: S.signoff.signedISO }
@@ -79,7 +79,7 @@ const Report = (() => {
       if (pp.length) {
         lines.push(""); lines.push(q("Individual results"));
         lines.push(["Participant","Role","Answered","Correct","Points","Max","Percent"].map(q).join(","));
-        pp.forEach(r => lines.push([r.p.name, roleById(CFG,r.p.roleId).name, r.answered, r.correct, r.pts, r.max, r.pct+"%"].map(q).join(",")));
+        pp.forEach(r => lines.push([r.p.name, pRoleNames(r.p).join(" + "), r.answered, r.correct, r.pts, r.max, r.pct+"%"].map(q).join(",")));
       }
     }
     const safe = (S.title || "drill").replace(/[^\w]+/g, "_");
@@ -92,12 +92,12 @@ const Report = (() => {
     const rd = ResultsScreen.readiness(R.pct);
     const logo = CFG.org.logoDataUrl ? `<img src="${CFG.org.logoDataUrl}" style="height:46px;max-width:160px;object-fit:contain">` : `<div class="r-logo">${esc((CFG.org.name||"PF")[0])}</div>`;
 
-    const attend = S.participants.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.email)||"\u2014"}</td><td>${esc(roleById(CFG,p.roleId).name)}</td></tr>`).join("");
+    const attend = S.participants.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.email)||"\u2014"}</td><td>${esc(pRoleNames(p).join(" + "))}</td></tr>`).join("");
     const roleRows = Object.entries(R.byRole).map(([rid,v]) => { const p=v.max?Math.round(v.pts/v.max*100):0; return `<tr><td>${esc(roleById(CFG,rid).name)}</td><td style="text-align:center">${v.n}</td><td style="text-align:center">${v.pts}/${v.max}</td><td style="text-align:center">${p}%</td></tr>`; }).join("");
     const ppList = S.capturePerPerson ? ResultsScreen.computePerPerson().filter(r=>r.answered>0) : [];
     const ppSection = ppList.length ? `<h2>Individual results</h2>
       <table><thead><tr><th>Participant</th><th>Role</th><th style="text-align:center">Answered</th><th style="text-align:center">Correct</th><th style="text-align:center">Points</th><th style="text-align:center">Score</th></tr></thead><tbody>
-      ${ppList.sort((a,b)=>b.pct-a.pct).map(r=>`<tr><td>${esc(r.p.name)}${r.p.email?` <span style="color:#8593a3">(${esc(r.p.email)})</span>`:''}</td><td>${esc(roleById(CFG,r.p.roleId).name)}</td><td style="text-align:center">${r.answered}/${S.scenario.injects.length}</td><td style="text-align:center">${r.correct}</td><td style="text-align:center">${r.pts}/${r.max}</td><td style="text-align:center">${r.pct}%</td></tr>`).join('')}
+      ${ppList.sort((a,b)=>b.pct-a.pct).map(r=>`<tr><td>${esc(r.p.name)}${r.p.email?` <span style="color:#8593a3">(${esc(r.p.email)})</span>`:''}</td><td>${esc(pRoleNames(r.p).join(" + "))}</td><td style="text-align:center">${r.answered}/${S.scenario.injects.length}</td><td style="text-align:center">${r.correct}</td><td style="text-align:center">${r.pts}/${r.max}</td><td style="text-align:center">${r.pct}%</td></tr>`).join('')}
       </tbody></table>` : "";
     const logRows = R.rows.map(({idx,inject,ans,sc}) => {
       const res = sc.result==="ok"?"Correct":sc.result==="partial"?"Partial":"Not correct";

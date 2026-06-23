@@ -34,7 +34,7 @@ const DrillScreen = (() => {
     const ans = S.answers[i];
     if (!ans.individual) ans.individual = {};
     const role = roleById(CFG, inject.role);
-    const respParts = S.participants.filter(p => p.roleId === inject.role);
+    const respParts = S.participants.filter(p => pHasRole(p, inject.role));
     const whoHas = respParts.map(p => p.name).filter(Boolean);
     const perPerson = !!S.capturePerPerson;
     const autoDerive = perPerson && respParts.length > 0;
@@ -56,7 +56,10 @@ const DrillScreen = (() => {
         <aside class="rail">
           <div class="rail-h">${esc(fill(scn.title, S.vars))}</div>
           <div class="timeline" id="timeline"></div>
-          <div style="margin-top:18px"><button class="btn sm block" id="endEarly">End &amp; score now</button></div>
+          <div style="margin-top:18px">
+            ${S.sessionMode !== "live" ? `<button class="btn sm block ghost" id="reviewBrief" style="margin-bottom:10px">${ICON.chevL} Review brief</button>` : ""}
+            <button class="btn sm block" id="endEarly">End &amp; score now</button>
+          </div>
         </aside>
 
         <section>
@@ -111,6 +114,8 @@ const DrillScreen = (() => {
     if (_replay) { _replay.title = "Replay voiceover"; _replay.onclick = () => speakInject(inject); }
     $("#prev").onclick = () => { if (S.cursor>0){ TTS.cancel(); S.cursor--; saveSession(); render(); } };
     $("#next").onclick = goNext;
+    const _reviewBrief = $("#reviewBrief");
+    if (_reviewBrief) _reviewBrief.onclick = () => { TTS.cancel(); S.step = "brief"; saveSession(); window.render(); };
     $("#endEarly").onclick = confirmEnd;
 
     TTS.onState(state => { _speaking = (state==="speaking"); const ind=$("#speakInd"); if(ind) ind.style.display = _speaking?"inline-flex":"none"; if(_replay) _replay.classList.toggle("active", _speaking); });
@@ -145,8 +150,8 @@ const DrillScreen = (() => {
       box.innerHTML = `<div class="pp-head">${ICON.users} ${liveHost?`Live answers · ${answered}/${S.participants.length} in`:"Record each participant’s answer"} ${autoDerive?`<span class="muted" style="font-weight:400">· the ${esc(role.short)} response counts toward the team score</span>`:`<span class="muted" style="font-weight:400">· no one holds the ${esc(role.short)} role — select the team answer above</span>`}</div>`;
       const grid = h(`<div class="pp-grid"></div>`);
       S.participants.forEach(p => {
-        const isResp = p.roleId === inject.role;
-        const row = h(`<div class="pp-row ${isResp?'resp':''}"><span class="pp-name">${esc(p.name||'\u2014')}<span class="pp-role">${esc(roleById(CFG,p.roleId).short)}${isResp?' · responsible':''}</span></span><span class="pp-opts"></span></div>`);
+        const isResp = pHasRole(p, inject.role);
+        const row = h(`<div class="pp-row ${isResp?'resp':''}"><span class="pp-name">${esc(p.name||'\u2014')}<span class="pp-role">${esc(pRoleShorts(p).join(" / ")||'\u2014')}${isResp?' · responsible':''}</span></span><span class="pp-opts"></span></div>`);
         const opts = $('.pp-opts', row);
         inject.options.forEach((o, idx) => {
           const sel = ans.individual[p.id] === idx;
