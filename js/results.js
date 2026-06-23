@@ -59,7 +59,7 @@ const ResultsScreen = (() => {
         }
       });
       return { p, answered, correct, pts, max, total, pct: max ? Math.round(pts/max*100) : 0 };
-    }).filter(r => r.total > 0 || true);
+    });
   }
 
   function readiness(pct) {

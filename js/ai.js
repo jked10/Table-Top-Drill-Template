@@ -172,7 +172,7 @@ Rules: exactly ${opts.count} injects, progressing through the phases in order; v
       correct: Math.max(0, Math.min(inj.correct, inj.options.length - 1)),
       partial: [],
       rationale: inj.rationale || "",
-      ref: inj.ref || "PFSP",
+      ref: inj.ref || "the procedure",
       points: inj.points || 10
     }));
     if (!s.injects.length) throw new Error("no valid injects");

@@ -374,6 +374,12 @@ function renderSetup() {
   const resume = (S.scenario && S.step === "setup" && S.answers.some(a => a.revealed));
   view().innerHTML = `<div class="wrap">
     ${progressBar("setup")}
+    <nav class="setup-nav" id="setupNav" aria-label="Jump to setup step">
+      <a class="sn-item" data-target="procCard"><span class="n">1</span>Procedure</a>
+      <a class="sn-item" data-target="setupCard"><span class="n">2</span>Session</a>
+      <a class="sn-item" data-target="attendCard"><span class="n">3</span>Attendance</a>
+      <a class="sn-item" data-target="scenarioCard"><span class="n">4</span>Scenario</a>
+    </nav>
     <div class="hero-split" style="margin-bottom:24px">
       <div class="hs-main">
         <div class="hs-eyebrow">Training · Drills · Readiness</div>
@@ -479,7 +485,7 @@ function renderSetup() {
       </div>
     </div>
 
-    <div class="card pad stack" style="margin-top:20px">
+    <div class="card pad stack" style="margin-top:20px" id="attendCard">
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
         <div>
           <div class="eyebrow">Step 3 \u00b7 Attendance</div>
@@ -491,7 +497,7 @@ function renderSetup() {
       <div class="plist" id="plist"></div>
     </div>
 
-    <div class="card pad stack" style="margin-top:20px">
+    <div class="card pad stack" style="margin-top:20px" id="scenarioCard">
       <div>
         <div class="eyebrow">Step 4 \u00b7 Scenario</div>
         <h2 style="margin-top:6px;font-size:22px">Generate the exercise</h2>
@@ -508,6 +514,7 @@ function renderSetup() {
   renderParticipants();
   renderScenarioChoice();
   renderPrefillBar();
+  wireSetupNav();
 
   // bind session fields
   const bind = (id, fn) => { const e = $(id); if (e) e.oninput = () => { fn(e.value); saveSession(); }; };
@@ -687,6 +694,29 @@ function renderPrefillBar() {
   </div>`;
   $("#usePrefill").onclick = applyProfile;
   $("#dismissPrefill").onclick = () => { w.innerHTML = ""; };
+}
+
+// Sticky in-page step nav for the (long) setup screen: click to jump, auto-highlight
+// the section currently in view.
+function wireSetupNav() {
+  const nav = $("#setupNav"); if (!nav) return;
+  const items = $$(".sn-item", nav);
+  const STICK = 118; // topbar + nav height-ish offset for scroll target
+  items.forEach(a => a.onclick = e => {
+    e.preventDefault();
+    const t = document.getElementById(a.dataset.target); if (!t) return;
+    const y = t.getBoundingClientRect().top + window.pageYOffset - STICK;
+    window.scrollTo({ top: y, behavior: "smooth" });
+  });
+  const targets = items.map(a => document.getElementById(a.dataset.target)).filter(Boolean);
+  if (!("IntersectionObserver" in window) || !targets.length) return;
+  const setActive = id => items.forEach(a => a.classList.toggle("active", a.dataset.target === id));
+  const io = new IntersectionObserver(entries => {
+    const vis = entries.filter(en => en.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+    if (vis[0]) setActive(vis[0].target.id);
+  }, { rootMargin: "-130px 0px -55% 0px", threshold: [0.1, 0.5] });
+  targets.forEach(t => io.observe(t));
+  setActive(targets[0].id);
 }
 
 function renderScenarioChoice() {
@@ -891,6 +921,7 @@ async function goToBrief() {
   if (S.sessionMode !== "live") {
     if (S.participants.length === 0) { toast("Add at least one participant"); return; }
     if (S.participants.some(p => !p.name.trim())) { toast("Every participant needs a name"); return; }
+    if (S.participants.some(p => pRoleIds(p).length === 0)) { toast("Every participant needs at least one role"); return; }
   }
 
   saveProfile();   // remember this complete setup so it can be reused next time
