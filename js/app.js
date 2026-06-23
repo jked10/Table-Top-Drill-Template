@@ -294,12 +294,11 @@ function renderTopbar() {
   const lvlMeta = CFG.securityLevels[lvl];
   const logo = CFG.org.logoDataUrl
     ? `<span class="logo"><img src="${CFG.org.logoDataUrl}" alt=""></span>`
-    : `<span class="logo">${esc((CFG.org.name||"PF")[0])}</span>`;
+    : `<span class="logo">DF</span>`;
   const showLevel = S.step === "drill" || S.step === "brief" || S.step === "results";
   return `<div class="topbar">
     <div class="brand" id="homeBtn" style="cursor:pointer" title="Back to setup">${logo}
-      <div><div class="name">${esc(CFG.org.name || "Port Facility")}</div>
-      <div class="sub">${esc(CFG.facility.name)} \u00b7 Tabletop Drill Facilitator</div></div>
+      <div><div class="name">DrillFrame</div></div>
     </div>
     <div class="spacer"></div>
     <div class="tb-actions">
@@ -709,14 +708,36 @@ function wireSetupNav() {
     window.scrollTo({ top: y, behavior: "smooth" });
   });
   const targets = items.map(a => document.getElementById(a.dataset.target)).filter(Boolean);
-  if (!("IntersectionObserver" in window) || !targets.length) return;
+  if (!targets.length) return;
   const setActive = id => items.forEach(a => a.classList.toggle("active", a.dataset.target === id));
-  const io = new IntersectionObserver(entries => {
-    const vis = entries.filter(en => en.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-    if (vis[0]) setActive(vis[0].target.id);
-  }, { rootMargin: "-130px 0px -55% 0px", threshold: [0.1, 0.5] });
-  targets.forEach(t => io.observe(t));
-  setActive(targets[0].id);
+
+  // Position-based scroll-spy: the active section is the LAST one whose top has
+  // crossed a line near the top of the viewport. Stable for short adjacent sections
+  // (no area-ratio flicker), with an explicit bottom-of-page guard for the final card.
+  const LINE = 140; // px from top of viewport
+  let ticking = false;
+  function update() {
+    ticking = false;
+    const scrollBottom = window.pageYOffset + window.innerHeight;
+    const docBottom = document.documentElement.scrollHeight;
+    // Within 2px of the bottom → always highlight the last step.
+    if (scrollBottom >= docBottom - 2) { setActive(targets[targets.length - 1].id); return; }
+    let current = targets[0].id;
+    for (const t of targets) {
+      if (t.getBoundingClientRect().top - LINE <= 0) current = t.id; else break;
+    }
+    setActive(current);
+  }
+  const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll, { passive: true });
+  // Clean up the old listeners on the next render so they don't stack up.
+  if (window.__setupNavCleanup) window.__setupNavCleanup();
+  window.__setupNavCleanup = () => {
+    window.removeEventListener("scroll", onScroll);
+    window.removeEventListener("resize", onScroll);
+  };
+  update();
 }
 
 function renderScenarioChoice() {
