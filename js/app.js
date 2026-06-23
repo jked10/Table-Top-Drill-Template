@@ -201,8 +201,14 @@ function applyProfile() {
   toast("Saved details loaded");
 }
 function startFresh() {
+  freshBoot();
+  render();
+  toast(loadProfile() ? "Fresh session — your details are saved, use “Use saved details” to reuse them" : "Fresh session started");
+}
+// Clear the reusable fields to empty (branding logo & settings kept), stashing a
+// restorable profile first. Used by the explicit "fresh" buttons and on boot.
+function freshBoot() {
   saveProfile();
-  // empty the reusable procedure fields & roles (branding/logo & settings are kept)
   CFG.org.name = "";
   CFG.facility.name = ""; CFG.facility.planTitle = ""; CFG.facility.location = "";
   CFG.facility.planRef = ""; CFG.facility.type = ""; CFG.facility.planText = "";
@@ -210,8 +216,6 @@ function startFresh() {
   saveConfig(CFG);
   S = newSession();
   clearSession();
-  render();
-  toast(loadProfile() ? "Fresh session — your details are saved, use “Use saved details” to reuse them" : "Fresh session started");
 }
 
 /* ---------------- scenario resolution ---------------- */
@@ -853,8 +857,7 @@ function renderProcLibStatus() {
   const folder = LIB.folders.find(f => f.sig === curSig());
   const n = folder ? (folder.scenarios || []).length : 0;
   if (!n) { w.innerHTML = `<span class="muted small">No scenarios generated yet for this procedure.</span>`; return; }
-  w.innerHTML = `<div class="muted small" style="margin-bottom:8px">${n} scenario${n>1?"s":""} ready — pick one in Step 4, or run “Surprise me”.</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px">${folder.scenarios.map(s=>`<span class="tag" style="background:var(--surface-2)">${esc(s.title)}</span>`).join("")}</div>`;
+  w.innerHTML = `<div class="muted small">${n} scenario${n>1?"s":""} ready — pick one in Step 4, or run “Surprise me”.</div>`;
 }
 
 async function generateLibrary(btnSel) {
@@ -1162,6 +1165,17 @@ window.addEventListener("DOMContentLoaded", () => {
   if (joinCode && !(S.mode === "participant" && S.step === "participant")) {
     S.mode = "participant"; S.step = "join"; if (!S.room) S.room = { code: joinCode.toUpperCase(), uid: null };
     saveSession();
+  } else {
+    // Fresh-on-open: unless we're resuming an in-progress drill, start with empty
+    // fields. Details are stashed to a restorable profile ("Use saved details").
+    const resuming = S && (
+      S.mode === "participant" ||
+      ["drill","results","brief","lobby","participant","join"].includes(S.step) ||
+      (S.scenario && Array.isArray(S.answers) && S.answers.some(a => a && a.revealed))
+    );
+    const hasFilled = (CFG.facility && (CFG.facility.name || CFG.facility.planText))
+      || S.title || (S.participants && S.participants.length);
+    if (!resuming && hasFilled) freshBoot();
   }
   render();
 });
