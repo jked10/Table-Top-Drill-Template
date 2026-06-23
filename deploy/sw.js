@@ -1,6 +1,6 @@
 /* DrillFrame service worker — offline app shell.
    Bump CACHE on every release so clients pull fresh files. */
-const CACHE = "drillframe-v1";
+const CACHE = "drillframe-v2";
 const SHELL = [
   "./",
   "./index.html",
@@ -41,6 +41,15 @@ self.addEventListener("fetch", e => {
     e.respondWith(fetch(req).then(r => { caches.open(CACHE).then(c => c.put(req, r.clone())); return r; }).catch(() => caches.match("./index.html")));
     return;
   }
-  // Cache-first for same-origin assets.
-  e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put(req, cp)); return r; })));
+  // Stale-while-revalidate for same-origin assets: serve cache instantly, but always
+  // fetch a fresh copy in the background so the NEXT load gets the latest deploy.
+  e.respondWith(
+    caches.match(req).then(hit => {
+      const network = fetch(req).then(r => {
+        if (r && r.ok) { const cp = r.clone(); caches.open(CACHE).then(c => c.put(req, cp)); }
+        return r;
+      }).catch(() => hit);
+      return hit || network;
+    })
+  );
 });
